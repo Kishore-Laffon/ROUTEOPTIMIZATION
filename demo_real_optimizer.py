@@ -214,6 +214,11 @@ def solve_vrp(locations: list[dict], num_vehicles: int = 3) -> dict:
 async def root():
     return {"status": "ok", "message": "SupplySense Real Optimizer Running"}
 
+@app.get("/health")
+async def health():
+    """Health check endpoint for deployment monitoring"""
+    return {"status": "healthy", "service": "route-optimization-api"}
+
 @app.post("/token")
 async def login(request: LoginRequest):
     """Login endpoint"""

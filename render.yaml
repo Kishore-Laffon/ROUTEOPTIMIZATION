@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: route-optimization-api
+    env: python
+    plan: free
+    
+    # Build configuration
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn demo_real_optimizer:app --host 0.0.0.0 --port 8000
+    
+    # Environment variables (set these in Render dashboard)
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      - key: SECRET_KEY
+        fromFile: /etc/secrets/secret_key
+      - key: SUPABASE_URL
+        fromFile: /etc/secrets/supabase_url
+      - key: SUPABASE_KEY
+        fromFile: /etc/secrets/supabase_key
+    
+    # Health check
+    healthCheckPath: /health
+    healthCheckStartupFailureThresholdCount: 100
+    healthCheckInterval: 30
