@@ -1,6 +1,7 @@
 # SupplySense AI Routing Module — requirements.txt
 # Module 3: Route Optimization (OR-Tools CVRPTW)
-# Python 3.12 required
+# Python 3.12 or 3.13 required (NOT 3.14 - pydantic-core lacks wheels for 3.14)
+# Render users: Change Python version to 3.13.x in Dashboard > Environment
 
 # ── Core API ──────────────────────────────────────────────────────────
 fastapi==0.110.0
