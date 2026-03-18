@@ -46,11 +46,11 @@ aiosmtplib==3.0.1
 python-dotenv==1.0.1
 
 # ── Route Optimization — THE CORE AI ENGINE ───────────────────────────
-# OR-Tools 9.8.3296 — Google's CVRPTW solver
+# OR-Tools 9.15+ — Google's CVRPTW solver
 # Same algorithm class used by Amazon and UPS for delivery routing
 # Peak memory: ~400 MB during 50-stop solve
-# DO NOT change this version — API changed in newer versions
-ortools==9.8.3296
+# Updated to latest available version (9.8.3296 no longer available on PyPI)
+ortools>=9.10,<10.0
 
 # ── Distance Matrix ───────────────────────────────────────────────────
 # Math for Haversine fallback when Google Maps API is unavailable
