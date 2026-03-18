@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Debug - SupplySense</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #00ff00;
+            margin: 0;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #00ffff;
+        }
+        .controls {
+            margin-bottom: 20px;
+            padding: 10px;
+            background: #2d2d2d;
+            border-radius: 4px;
+        }
+        input, button {
+            padding: 8px;
+            margin: 5px;
+            font-family: monospace;
+            background: #3d3d3d;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .log {
+            background: #1e1e1e;
+            border: 1px solid #00ff00;
+            border-radius: 4px;
+            padding: 10px;
+            height: 500px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        .log-entry {
+            padding: 5px;
+            border-bottom: 1px solid #333;
+            font-size: 12px;
+        }
+        .log-entry.ready { color: #00ff00; }
+        .log-entry.progress { color: #ffff00; }
+        .log-entry.complete { color: #00ff00; font-weight: bold; }
+        .log-entry.error { color: #ff0000; }
+        .log-entry.info { color: #00ffff; }
+        .location { color: #ff00ff; }
+        .route { color: #00ffff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 WebSocket Debug Console</h1>
+        
+        <div class="controls">
+            <input type="text" id="fromLat" placeholder="From Lat" value="13.038">
+            <input type="text" id="fromLng" placeholder="From Lng" value="80.278">
+            <input type="text" id="toLat" placeholder="To Lat" value="11.880">
+            <input type="text" id="toLng" placeholder="To Lng" value="79.828">
+            <button onclick="calculateRoute()">📍 Send Calculate</button>
+            <button onclick="clearLog()">🗑️ Clear Log</button>
+        </div>
+        
+        <div class="log" id="log"></div>
+    </div>
+
+    <script>
+        const log = document.getElementById('log');
+        let ws = null;
+        let token = null;
+        let currentJobId = null;
+
+        function addLog(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        async function connect() {
+            try {
+                // Get token
+                const loginRes = await fetch('http://localhost:8010/token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: 'admin', password: 'admin123' })
+                });
+                const loginData = await loginRes.json();
+                token = loginData.access_token;
+                addLog(`✓ Token acquired: ${token.substring(0, 20)}...`, 'ready');
+
+                // Connect WebSocket
+                ws = new WebSocket(`ws://localhost:8010/ws/optimize?token=${token}`);
+                
+                ws.onopen = () => {
+                    addLog('✓ WebSocket connected', 'ready');
+                };
+                
+                ws.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    const type = data.type;
+                    addLog(`[${type}] ${JSON.stringify(data).substring(0, 150)}...`, type);
+                };
+                
+                ws.onerror = (error) => {
+                    addLog(`❌ WebSocket error: ${error}`, 'error');
+                };
+                
+                ws.onclose = () => {
+                    addLog('⚠️ WebSocket closed', 'error');
+                };
+            } catch (err) {
+                addLog(`❌ Error: ${err.message}`, 'error');
+            }
+        }
+
+        function calculateRoute() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                addLog('❌ WebSocket not connected!', 'error');
+                return;
+            }
+            
+            currentJobId = Date.now();
+            const fromLat = parseFloat(document.getElementById('fromLat').value);
+            const fromLng = parseFloat(document.getElementById('fromLng').value);
+            const toLat = parseFloat(document.getElementById('toLat').value);
+            const toLng = parseFloat(document.getElementById('toLng').value);
+            
+            addLog(`Starting optimization (Job: ${currentJobId})`, 'info');
+            
+            ws.send(JSON.stringify({
+                type: 'start_optimization',
+                client_job_id: currentJobId,
+                locations: [
+                    { lat: fromLat, lng: fromLng },
+                    { lat: toLat, lng: toLng }
+                ]
+            }));
+        }
+
+        function clearLog() {
+            log.innerHTML = '';
+            addLog('Log cleared', 'info');
+        }
+
+        // Connect on load
+        window.addEventListener('DOMContentLoaded', connect);
+    </script>
+</body>
+</html>

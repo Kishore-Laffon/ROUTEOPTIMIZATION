@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SupplySense - Route Optimization with Vehicle Animation</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+        
+        #map {
+            flex: 1;
+            background: white;
+            position: relative;
+        }
+        
+        .sidebar {
+            width: 400px;
+            background: white;
+            border-left: 1px solid #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            box-shadow: -2px 0 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .header h1 {
+            font-size: 18px;
+            margin: 0;
+        }
+        
+        .header p {
+            font-size: 12px;
+            margin: 5px 0 0 0;
+            opacity: 0.9;
+        }
+        
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
+        .section {
+            margin-bottom: 20px;
+        }
+        
+        .section-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: #999;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+        
+        .stat {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #f5f5f5;
+            font-size: 13px;
+        }
+        
+        .stat-value {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .location-input {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .location-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px;
+            background: #f9f9f9;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        
+        .location-group span {
+            flex: 1;
+        }
+        
+        .location-group button {
+            padding: 4px 8px;
+            font-size: 11px;
+            background: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        
+        .location-group button:hover {
+            background: #e0e0e0;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+        }
+        
+        button, .btn {
+            flex: 1;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        
+        button:disabled, .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        button:hover:not(:disabled), .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .tab-bar {
+            display: flex;
+            gap: 0;
+            border-bottom: 1px solid #e0e0e0;
+            margin-bottom: 15px;
+        }
+        
+        .tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            font-size: 12px;
+            font-weight: 600;
+            color: #999;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+        
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #f0f0f0;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+        }
+        
+        .speed-slider {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #ddd;
+            cursor: pointer;
+            margin: 10px 0;
+        }
+        
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status.animating {
+            background: #cfe2ff;
+            color: #084298;
+        }
+        
+        .status.info {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+        
+        .instruction {
+            padding: 12px;
+            background: #f0f0f0;
+            border-left: 3px solid #667eea;
+            font-size: 12px;
+            line-height: 1.5;
+            border-radius: 3px;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="map"></div>
+        
+        <div class="sidebar">
+            <div class="header">
+                <h1>SupplySense</h1>
+                <p>Route Optimization with Vehicle Animation</p>
+            </div>
+            
+            <div class="tab-bar">
+                <div class="tab active" onclick="switchTab('route')">📍 Route</div>
+                <div class="tab" onclick="switchTab('animation')">🚚 Animation</div>
+                <div class="tab" onclick="switchTab('stats')">📊 Stats</div>
+            </div>
+            
+            <div class="content">
+                <!-- Route Tab -->
+                <div id="route-tab" class="tab-content active">
+                    <div id="connectionStatus" class="status connected">
+                        Connecting to server...
+                    </div>
+                    
+                    <div class="section">
+                        <div class="section-title">Select Locations</div>
+                        <div class="instruction">
+                            Click on the map to select FROM and TO locations
+                        </div>
+                        
+                        <div id="fromLocation" class="location-group" style="display: none;">
+                            <span>📍 FROM: <strong id="fromText"></strong></span>
+                            <button onclick="clearFromLocation()">×</button>
+                        </div>
+                        
+                        <div id="toLocation" class="location-group" style="display: none;">
+                            <span>🎯 TO: <strong id="toText"></strong></span>
+                            <button onclick="clearToLocation()">×</button>
+                        </div>
+                    </div>
+                    
+                    <div class="section">
+                        <div class="button-group">
+                            <button id="calculateBtn" onclick="startRouteCalculation()" disabled>
+                                Calculate Route
+                            </button>
+                            <button id="clearBtn" onclick="hardClearMap()">Clear</button>
+                        </div>
+                    </div>
+                    
+                    <div class="section">
+                        <div class="section-title">Route Progress</div>
+                        <div class="progress-bar">
+                            <div id="progressFill" class="progress-fill"></div>
+                        </div>
+                        <div class="stat">
+                            <span>Status</span>
+                            <span class="stat-value" id="routeStatus">Idle</span>
+                        </div>
+                    </div>
+                    
+                    <div class="section" id="routeInfo" style="display: none;">
+                        <div class="section-title">Route Details</div>
+                        <div class="stat">
+                            <span>Distance</span>
+                            <span class="stat-value" id="routeDistance">0 km</span>
+                        </div>
+                        <div class="stat">
+                            <span>Time Est.</span>
+                            <span class="stat-value" id="routeTime">00:00</span>
+                        </div>
+                        <div class="stat">
+                            <span>Waypoints</span>
+                            <span class="stat-value" id="waypointCount">0</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Animation Tab -->
+                <div id="animation-tab" class="tab-content">
+                    <div id="animationStatus" class="status info">
+                        Load a route first
+                    </div>
+                    
+                    <div class="section">
+                        <div class="section-title">Playback Controls</div>
+                        <div class="button-group">
+                            <button id="playBtn" onclick="vehicleAnimator.startAnimation()" disabled>
+                                ▶ Play
+                            </button>
+                            <button id="pauseBtn" onclick="vehicleAnimator.pauseAnimation()" disabled style="flex: 0.5;">
+                                ⏸
+                            </button>
+                            <button id="resetBtn" onclick="vehicleAnimator.resetAnimation()" disabled style="flex: 0.5;">
+                                ⟲
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="section">
+                        <div class="section-title">Animation Speed</div>
+                        <div style="font-size: 12px; color: #666; margin-bottom: 5px;">
+                            <span id="speedLabel">1.0x</span> (0.5x - 5x)
+                        </div>
+                        <input 
+                            type="range" 
+                            id="speedSlider" 
+                            class="speed-slider"
+                            min="0.5" 
+                            max="5" 
+                            step="0.5" 
+                            value="1"
+                            oninput="vehicleAnimator.setSpeedMultiplier(this.value)"
+                            disabled
+                        >
+                    </div>
+                    
+                    <div class="section">
+                        <div class="section-title">Progress</div>
+                        <div class="progress-bar">
+                            <div id="animProgressFill" class="progress-fill"></div>
+                        </div>
+                        <div class="stat">
+                            <span>Completion</span>
+                            <span class="stat-value" id="animProgress">0%</span>
+                        </div>
+                    </div>
+                    
+                    <div class="section">
+                        <button id="followToggle" onclick="vehicleAnimator.toggleFollowMode()" disabled style="background: linear-gradient(135deg, #44aa88 0%, #2a6f5f 100%);">
+                            📍 Follow: ON
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Stats Tab -->
+                <div id="stats-tab" class="tab-content">
+                    <div class="section">
+                        <div class="section-title">Live Vehicle Stats</div>
+                        <div class="stat">
+                            <span>Speed</span>
+                            <span class="stat-value" id="liveSpeed">0 km/h</span>
+                        </div>
+                        <div class="stat">
+                            <span>Distance</span>
+                            <span class="stat-value" id="liveDist">0 km</span>
+                        </div>
+                        <div class="stat">
+                            <span>Remaining</span>
+                            <span class="stat-value" id="liveRemaining">0 km</span>
+                        </div>
+                        <div class="stat">
+                            <span>ETA</span>
+                            <span class="stat-value" id="liveETA">--:--</span>
+                        </div>
+                        <div class="stat">
+                            <span>Bearing</span>
+                            <span class="stat-value" id="liveBearing">0°</span>
+                        </div>
+                    </div>
+                    
+                    <div class="section">
+                        <div class="section-title">Route Information</div>
+                        <div class="stat">
+                            <span>Total Distance</span>
+                            <span class="stat-value" id="totalDist">0 km</span>
+                        </div>
+                        <div class="stat">
+                            <span>Est. Duration</span>
+                            <span class="stat-value" id="estDuration">--:--</span>
+                        </div>
+                        <div class="stat">
+                            <span>Total Points</span>
+                            <span class="stat-value" id="totalPoints">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    
+    <script>
+        // ============ GLOBAL STATE ============
+        let map = null;
+        let token = null;
+        let ws = null;
+        let currentJobId = null;
+        let activeJobId = null;
+        let polyline = null;
+        let markers = {};
+        let fromLocation = null;
+        let toLocation = null;
+        let vehicleAnimator = null;
+        let currentRoute = null;
+        
+        // ============ TAB SWITCHING ============
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(el => {
+                el.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(el => {
+                el.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabName + '-tab').classList.add('active');
+            event.target.classList.add('active');
+        }
+        
+        // ============ WEBSOCKET CONNECTION ============
+        window.addEventListener('DOMContentLoaded', function() {
+            // Initialize map
+            map = L.map('map').setView([20.5937, 78.9629], 5);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© OpenStreetMap'
+            }).addTo(map);
+            
+            // Setup map click handler
+            map.on('click', function(e) {
+                selectLocation(e.latlng);
+            });
+            
+            // Connect to server
+            fetchTokenAndConnect();
+            console.log('[INIT] Page initialized, map ready');
+        });
+        
+        async function fetchTokenAndConnect() {
+            try {
+                const response = await fetch('http://localhost:8010/token');
+                const data = await response.json();
+                token = data.access_token;
+                console.log('[AUTH] Token acquired');
+                
+                connectWebSocket();
+                updateConnectionStatus('Connected');
+            } catch (error) {
+                console.error('[AUTH] Failed to get token:', error);
+                updateConnectionStatus('Connection failed', 'error');
+            }
+        }
+        
+        function connectWebSocket() {
+            const wsUrl = `ws://localhost:8010/ws/optimize?token=${token}`;
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = () => {
+                console.log('[WS] Connected');
+                updateConnectionStatus('Connected to server');
+            };
+            
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                handleWebSocketMessage(data);
+            };
+            
+            ws.onerror = (error) => {
+                console.error('[WS] Error:', error);
+                updateConnectionStatus('WebSocket error', 'error');
+            };
+        }
+        
+        function updateConnectionStatus(message, type = 'connected') {
+            const el = document.getElementById('connectionStatus');
+            el.textContent = message;
+            el.className = 'status ' + type;
+        }
+        
+        // ============ MAP INTERACTION ============
+        function selectLocation(latlng) {
+            if (!fromLocation) {
+                fromLocation = { lat: latlng.lat, lng: latlng.lng };
+                updateLocationUI();
+                console.log('[MAP] FROM location set:', fromLocation);
+            } else if (!toLocation) {
+                toLocation = { lat: latlng.lat, lng: latlng.lng };
+                updateLocationUI();
+                console.log('[MAP] TO location set:', toLocation);
+                document.getElementById('calculateBtn').disabled = false;
+            }
+        }
+        
+        function updateLocationUI() {
+            if (fromLocation) {
+                document.getElementById('fromLocation').style.display = 'flex';
+                document.getElementById('fromText').textContent = 
+                    `${fromLocation.lat.toFixed(3)}, ${fromLocation.lng.toFixed(3)}`;
+            }
+            if (toLocation) {
+                document.getElementById('toLocation').style.display = 'flex';
+                document.getElementById('toText').textContent = 
+                    `${toLocation.lat.toFixed(3)}, ${toLocation.lng.toFixed(3)}`;
+            }
+        }
+        
+        function clearFromLocation() {
+            fromLocation = null;
+            document.getElementById('fromLocation').style.display = 'none';
+            document.getElementById('calculateBtn').disabled = true;
+            updateLocationUI();
+        }
+        
+        function clearToLocation() {
+            toLocation = null;
+            document.getElementById('toLocation').style.display = 'none';
+            document.getElementById('calculateBtn').disabled = fromLocation ? false : true;
+            updateLocationUI();
+        }
+        
+        // ============ ROUTE CALCULATION ============
+        let optimizationTimeout = null;
+        
+        function startRouteCalculation() {
+            if (!fromLocation || !toLocation) return;
+            
+            // Save locations BEFORE clearing map
+            const from = { lat: fromLocation.lat, lng: fromLocation.lng };
+            const to = { lat: toLocation.lat, lng: toLocation.lng };
+            
+            currentJobId = Date.now();
+            activeJobId = currentJobId;
+            
+            console.log('[ROUTE] Starting optimization, job_id:', currentJobId);
+            
+            // Clear old route visualization (but keep location markers)
+            if (polyline) {
+                map.removeLayer(polyline);
+                polyline = null;
+            }
+            
+            document.getElementById('progressFill').style.width = '0%';
+            document.getElementById('routeStatus').textContent = 'Routing...'  ;
+            document.getElementById('calculateBtn').disabled = true;
+            
+            // Set timeout to abort if no complete message
+            optimizationTimeout = setTimeout(() => {
+                console.error('[ROUTE] ❌ TIMEOUT - No complete message after 45 seconds');
+                document.getElementById('routeStatus').textContent = 'Error: Calculation timeout';
+                document.getElementById('calculateBtn').disabled = false;
+                activeJobId = null;
+            }, 45000);
+            
+            // Send with saved locations
+            ws.send(JSON.stringify({
+                type: 'start_optimization',
+                locations: [from, to],
+                client_job_id: currentJobId
+            }));
+        }
+        
+        function hardClearMap() {
+            console.log('[MAP] Clearing map...');
+            
+            // Clear polyline
+            if (polyline) {
+                map.removeLayer(polyline);
+                polyline = null;
+            }
+            
+            // Clear markers
+            Object.values(markers).forEach(marker => {
+                if (marker) {
+                    map.removeLayer(marker);
+                }
+            });
+            markers = {};
+            
+            // Clear locations
+            fromLocation = null;
+            toLocation = null;
+            currentRoute = null;
+            activeJobId = null;
+            
+            // Clear timeout if pending
+            if (optimizationTimeout) {
+                clearTimeout(optimizationTimeout);
+                optimizationTimeout = null;
+            }
+            
+            // Update UI
+            document.getElementById('fromLocation').style.display = 'none';
+            document.getElementById('toLocation').style.display = 'none';
+            document.getElementById('calculateBtn').disabled = true;
+            document.getElementById('routeStatus').textContent = 'Select locations to start';
+            document.getElementById('routeInfo').style.display = 'none';
+            document.getElementById('progressFill').style.width = '0%';
+            
+            console.log('[MAP] ✓ Map cleared completely');
+        }
+        
+        // ============ WEBSOCKET MESSAGE HANDLER ============
+        function handleWebSocketMessage(data) {
+            console.log('[WS] Raw message:', JSON.stringify(data).substring(0, 300));
+            
+            // Check if message has a job ID to filter
+            const messageJobId = data.client_job_id || data.job_id;
+            
+            // Log job ID comparison
+            console.log(`[WS] Job IDs - Message: ${messageJobId} (type: ${typeof messageJobId}), Active: ${activeJobId} (type: ${typeof activeJobId})`);
+            
+            // Only filter messages that ARE part of an ongoing optimization
+            if (messageJobId && messageJobId !== activeJobId && activeJobId !== null) {
+                console.log(`[WS] ❌ FILTERED - Stale job`);
+                return;
+            }
+            
+            console.log(`[WS] ✓ Accepted - ${data.type}`);
+            
+            switch (data.type) {
+                case 'ready':
+                    document.getElementById('routeStatus').textContent = 'Waiting...';
+                    console.log('[WS] Ready message received');
+                    break;
+                
+                case 'location':
+                    console.log('[WS] Location marker:', data.label);
+                    break;
+                
+                case 'route':
+                    console.log('[WS] Route received:', data.distance_km + ' km');
+                    document.getElementById('routeStatus').textContent = 'Route calculated...';
+                    break;
+                
+                case 'route_update':
+                    console.log('[WS] Route updated:', data.route_index);
+                    break;
+                
+                case 'progress':
+                    // Calculate progress from elapsed/total
+                    let progress = 0;
+                    if (data.elapsed !== undefined && data.total !== undefined) {
+                        progress = Math.min(99, Math.round((data.elapsed / data.total) * 100));
+                    } else if (data.progress_percent !== undefined) {
+                        progress = data.progress_percent;
+                    }
+                    console.log('[WS] Progress:', progress + '%');
+                    document.getElementById('progressFill').style.width = progress + '%';
+                    document.getElementById('routeStatus').textContent = `Optimizing ${progress}%`;
+                    break;
+                
+                case 'complete':
+                    // Clear timeout since we got the response
+                    if (optimizationTimeout) {
+                        clearTimeout(optimizationTimeout);
+                        optimizationTimeout = null;
+                    }
+                    
+                    console.log('[ROUTE] ✓ COMPLETE event received!');
+                    console.log('[ROUTE] Waypoints:', data.waypoints ? data.waypoints.length : 'NONE');
+                    
+                    if (!data.waypoints || data.waypoints.length === 0) {
+                        console.error('[ROUTE] ❌ No waypoints in complete event!');
+                        document.getElementById('routeStatus').textContent = 'Error: No waypoints';
+                        document.getElementById('calculateBtn').disabled = false;
+                        return;
+                    }
+                    
+                    currentRoute = data;
+                    console.log('[ROUTE] Drawing route with', data.waypoints.length, 'waypoints');
+                    
+                    // Update progress to 100%
+                    document.getElementById('progressFill').style.width = '100%';
+                    document.getElementById('routeStatus').textContent = 'Complete - Drawing route...';
+                    
+                    // Draw route and init animator
+                    try {
+                        drawRoute(data);
+                        console.log('[ROUTE] Route drawn successfully');
+                        
+                        initializeVehicleAnimator(data.waypoints);
+                        console.log('[ROUTE] Vehicle animator initialized');
+                        
+                        document.getElementById('routeStatus').textContent = '✓ Route Ready';
+                        document.getElementById('routeInfo').style.display = 'block';
+                        document.getElementById('calculateBtn').disabled = false;
+                        console.log('[ROUTE] ✓ All ready!');
+                    } catch (err) {
+                        console.error('[ROUTE] ❌ Error during route setup:', err);
+                        document.getElementById('routeStatus').textContent = 'Error: ' + err.message;
+                        document.getElementById('calculateBtn').disabled = false;
+                    }
+                    break;
+                
+                case 'error':
+                    console.error('[WS] Error:', data.message);
+                    document.getElementById('routeStatus').textContent = 'Error: ' + data.message;
+                    document.getElementById('calculateBtn').disabled = false;
+                    break;
+            }
+        }
+        
+        // ============ ROUTE DRAWING ============
+        async function drawRoute(data) {
+            console.log('[ROUTE] drawRoute called with:', data);
+            
+            if (!data.waypoints || data.waypoints.length < 2) {
+                console.error('[ROUTE] ❌ Invalid waypoints:', data.waypoints);
+                throw new Error('Invalid waypoints: need at least 2');
+            }
+            
+            try {
+                console.log('[ROUTE] Fetching OSRM geometry for', data.waypoints.length, 'waypoints');
+                
+                // Fetch OSRM geometry
+                const coordStr = data.waypoints
+                    .map(wp => `${wp[1]},${wp[0]}`)
+                    .join(';');
+                
+                console.log('[ROUTE] OSRM URL coords:', coordStr.substring(0, 100));
+                
+                const url = `https://router.project-osrm.org/route/v1/driving/${coordStr}?overview=full&geometries=geojson`;
+                const res = await fetch(url);
+                
+                if (!res.ok) {
+                    throw new Error(`OSRM returned ${res.status}`);
+                }
+                
+                const json = await res.json();
+                
+                if (!json.routes || !json.routes[0]) {
+                    console.log('[ROUTE] ⚠ OSRM no routes, drawing fallback');
+                    drawFallbackRoute(data.waypoints);
+                    return;
+                }
+                
+                const coords = json.routes[0].geometry.coordinates;
+                const geometry = coords.map(coord => [coord[1], coord[0]]);
+                
+                console.log('[ROUTE] ✓ OSRM returned', geometry.length, 'points');
+                
+                // Draw polyline
+                if (polyline) map.removeLayer(polyline);
+                polyline = L.polyline(geometry, {
+                    color: '#667eea',
+                    weight: 4,
+                    opacity: 0.7
+                }).addTo(map);
+                
+                console.log('[ROUTE] ✓ Polyline drawn on map');
+                
+                // Update animator with full OSRM geometry
+                if (vehicleAnimator) {
+                    vehicleAnimator.loadRoute(geometry);
+                    console.log('[ROUTE] ✓ Animator updated with', geometry.length, 'points');
+                }
+                
+                // Fit bounds
+                map.fitBounds(polyline.getBounds(), { padding: [80, 50] });
+                console.log('[ROUTE] ✓ Map zoomed to route bounds');
+                
+                // Update route info
+                document.getElementById('routeDistance').textContent = 
+                    (data.distance_km || 0).toFixed(2) + ' km';
+                document.getElementById('routeTime').textContent = 
+                    formatTime(data.estimated_time_min || 0);
+                document.getElementById('waypointCount').textContent = data.waypoints.length;
+                console.log('[ROUTE] ✓ Route info updated');
+                
+            } catch (error) {
+                console.error('[ROUTE] ❌ Error:', error);
+                console.log('[ROUTE] Drawing fallback route');
+                drawFallbackRoute(data.waypoints);
+            }
+        }
+        
+        function drawFallbackRoute(waypoints) {
+            if (polyline) map.removeLayer(polyline);
+            polyline = L.polyline(waypoints, {
+                color: '#667eea',
+                weight: 3,
+                dashArray: '5,10',
+                opacity: 0.5
+            }).addTo(map);
+            map.fitBounds(polyline.getBounds(), { padding: [80, 50] });
+        }
+        
+        function formatTime(minutes) {
+            const h = Math.floor(minutes / 60);
+            const m = Math.floor(minutes % 60);
+            return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+        }
+        
+        // ============ VEHICLE ANIMATOR CLASS ============
+        class VehicleAnimationEngine {
+            constructor(mapObj, routeCoords) {
+                this.map = mapObj;
+                this.routeCoordinates = routeCoords || [];
+                this.vehicleMarker = null;
+                this.animationId = null;
+                this.isAnimating = false;
+                this.isPaused = false;
+                this.currentIndex = 0;
+                this.interpolationProgress = 0;
+                this.speedKmh = 60;
+                this.speedMultiplier = 1.0;
+                this.distanceCovered = 0;
+                this.startTime = null;
+                this.followMode = true;
+            }
+            
+            loadRoute(coords) {
+                this.routeCoordinates = coords;
+                this.currentIndex = 0;
+                this.interpolationProgress = 0;
+                this.distanceCovered = 0;
+                this.isAnimating = false;
+                this.isPaused = false;
+                this.createVehicleMarker();
+                this.updateAnimationUI();
+                console.log('[ANIMATOR] Route loaded:', coords.length, 'points');
+            }
+            
+            createVehicleMarker() {
+                if (this.vehicleMarker) this.map.removeLayer(this.vehicleMarker);
+                
+                const icon = L.divIcon({
+                    html: `<div style="
+                        width: 40px; height: 40px;
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        border-radius: 50%; border: 3px solid white;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                        display: flex; align-items: center; justify-content: center;
+                        font-size: 22px;
+                    " id="vehicleIcon">🚚</div>`,
+                    iconSize: [40, 40],
+                    iconAnchor: [20, 20]
+                });
+                
+                this.vehicleMarker = L.marker(this.routeCoordinates[0], { icon }).addTo(this.map);
+            }
+            
+            startAnimation() {
+                console.log('[ANIMATOR] Starting');
+                this.isAnimating = true;
+                this.isPaused = false;
+                this.startTime = Date.now();
+                this.distanceCovered = 0;
+                this.currentIndex = 0;
+                this.interpolationProgress = 0;
+                this.updateAnimationUI();
+                this.animate();
+            }
+            
+            pauseAnimation() {
+                console.log('[ANIMATOR] Paused');
+                this.isAnimating = false;
+                this.isPaused = true;
+                if (this.animationId) cancelAnimationFrame(this.animationId);
+                this.updateAnimationUI();
+            }
+            
+            resumeAnimation() {
+                console.log('[ANIMATOR] Resumed');
+                this.isAnimating = true;
+                this.isPaused = false;
+                this.startTime = Date.now() - (this.distanceCovered * 3.6 / this.speedKmh / this.speedMultiplier * 1000);
+                this.updateAnimationUI();
+                this.animate();
+            }
+            
+            resetAnimation() {
+                console.log('[ANIMATOR] Reset');
+                this.isAnimating = false;
+                this.isPaused = false;
+                this.currentIndex = 0;
+                this.interpolationProgress = 0;
+                this.distanceCovered = 0;
+                this.vehicleMarker.setLatLng(this.routeCoordinates[0]);
+                document.getElementById('vehicleIcon').style.transform = 'rotate(0deg)';
+                if (this.animationId) cancelAnimationFrame(this.animationId);
+                this.updateAnimationUI();
+            }
+            
+            setSpeedMultiplier(value) {
+                this.speedMultiplier = parseFloat(value);
+                document.getElementById('speedLabel').textContent = value + 'x';
+            }
+            
+            toggleFollowMode() {
+                this.followMode = !this.followMode;
+                const btn = document.getElementById('followToggle');
+                btn.textContent = this.followMode ? '📍 Follow: ON' : '📍 Follow: OFF';
+            }
+            
+            animate() {
+                if (!this.isAnimating) return;
+                
+                const elapsed = (Date.now() - this.startTime) / 1000;
+                const distancePerSecond = (this.speedKmh * this.speedMultiplier) / 3.6;
+                const targetDistance = elapsed * distancePerSecond;
+                
+                this.updatePositionByDistance(targetDistance);
+                
+                if (this.currentIndex >= this.routeCoordinates.length - 1 && this.interpolationProgress >= 1) {
+                    document.getElementById('animationStatus').textContent = '✅ Animation complete!';
+                    this.isAnimating = false;
+                    this.updateAnimationUI();
+                } else {
+                    this.animationId = requestAnimationFrame(() => this.animate());
+                }
+            }
+            
+            updatePositionByDistance(targetDistance) {
+                let accumDistance = 0;
+                
+                for (let i = 0; i < this.routeCoordinates.length - 1; i++) {
+                    const segmentDist = this.haversineDistance(
+                        this.routeCoordinates[i],
+                        this.routeCoordinates[i + 1]
+                    );
+                    
+                    if (accumDistance + segmentDist >= targetDistance) {
+                        this.currentIndex = i;
+                        const remaining = targetDistance - accumDistance;
+                        this.interpolationProgress = remaining / segmentDist;
+                        this.distanceCovered = targetDistance / 1000;
+                        this.updateVehiclePosition(
+                            this.routeCoordinates[i],
+                            this.routeCoordinates[i + 1],
+                            this.interpolationProgress
+                        );
+                        return;
+                    }
+                    accumDistance += segmentDist;
+                }
+            }
+            
+            updateVehiclePosition(current, next, progress) {
+                const interpolated = [
+                    current[0] + (next[0] - current[0]) * progress,
+                    current[1] + (next[1] - current[1]) * progress
+                ];
+                
+                this.vehicleMarker.setLatLng(interpolated);
+                
+                const bearing = this.calculateBearing(current, next);
+                document.getElementById('vehicleIcon').style.transform = `rotate(${bearing}deg)`;
+                
+                if (this.followMode) this.map.panTo(interpolated, { animate: false });
+                
+                this.updateStats();
+            }
+            
+            calculateBearing(from, to) {
+                const dLng = (to[1] - from[1]) * Math.PI / 180;
+                const lat1 = from[0] * Math.PI / 180;
+                const lat2 = to[0] * Math.PI / 180;
+                
+                const y = Math.sin(dLng) * Math.cos(lat2);
+                const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+                
+                return Math.round((Math.atan2(y, x) * 180 / Math.PI + 360) % 360);
+            }
+            
+            haversineDistance(coord1, coord2) {
+                const toRad = Math.PI / 180;
+                const lat1 = coord1[0] * toRad;
+                const lat2 = coord2[0] * toRad;
+                const dLat = (coord2[0] - coord1[0]) * toRad;
+                const dLng = (coord2[1] - coord1[1]) * toRad;
+                
+                const a = Math.sin(dLat / 2) ** 2 + 
+                         Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                return 6371000 * c;
+            }
+            
+            calculateTotalDistance() {
+                let total = 0;
+                for (let i = 0; i < this.routeCoordinates.length - 1; i++) {
+                    total += this.haversineDistance(
+                        this.routeCoordinates[i],
+                        this.routeCoordinates[i + 1]
+                    );
+                }
+                return total / 1000;
+            }
+            
+            updateStats() {
+                const totalDist = this.calculateTotalDistance();
+                const remaining = Math.max(0, totalDist - this.distanceCovered);
+                const speed = this.speedKmh * this.speedMultiplier;
+                
+                document.getElementById('liveSpeed').textContent = speed.toFixed(1) + ' km/h';
+                document.getElementById('liveDist').textContent = this.distanceCovered.toFixed(2) + ' km';
+                document.getElementById('liveRemaining').textContent = remaining.toFixed(2) + ' km';
+                
+                if (this.currentIndex < this.routeCoordinates.length - 1) {
+                    const bearing = this.calculateBearing(
+                        this.routeCoordinates[this.currentIndex],
+                        this.routeCoordinates[this.currentIndex + 1]
+                    );
+                    document.getElementById('liveBearing').textContent = bearing + '°';
+                }
+                
+                if (remaining > 0 && this.isAnimating) {
+                    const eta = (remaining * 3.6) / speed;
+                    const min = Math.floor(eta / 60);
+                    const sec = Math.floor(eta % 60);
+                    document.getElementById('liveETA').textContent = 
+                        `${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+                }
+                
+                const prog = (this.distanceCovered / totalDist) * 100;
+                document.getElementById('animProgressFill').style.width = prog + '%';
+                document.getElementById('animProgress').textContent = Math.floor(prog) + '%';
+                
+                document.getElementById('totalDist').textContent = totalDist.toFixed(2) + ' km';
+                document.getElementById('totalPoints').textContent = this.routeCoordinates.length;
+            }
+            
+            updateAnimationUI() {
+                const enabled = this.routeCoordinates.length > 0;
+                document.getElementById('playBtn').disabled = !enabled || this.isAnimating || this.isPaused;
+                document.getElementById('pauseBtn').disabled = !this.isAnimating;
+                document.getElementById('resetBtn').disabled = !enabled;
+                document.getElementById('speedSlider').disabled = !enabled;
+                document.getElementById('followToggle').disabled = !enabled;
+                
+                const status = this.isAnimating ? 'Animating...' : 
+                              this.isPaused ? 'Paused' : 
+                              enabled ? 'Ready' : 'Load a route';
+                document.getElementById('animationStatus').textContent = status;
+            }
+        }
+        
+        // ============ INITIALIZE ANIMATOR ============
+        function initializeVehicleAnimator(waypoints) {
+            if (!vehicleAnimator) {
+                vehicleAnimator = new VehicleAnimationEngine(map, waypoints);
+            } else {
+                vehicleAnimator.loadRoute(waypoints);
+            }
+            
+            vehicleAnimator.updateAnimationUI();
+            console.log('[INIT] Vehicle animator ready');
+        }
+    </script>
+</body>
+</html>

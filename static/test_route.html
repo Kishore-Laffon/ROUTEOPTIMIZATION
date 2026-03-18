@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Route Test</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        body { font-family: Arial; margin: 0; }
+        #map { height: 500px; width: 100%; }
+        #status { padding: 10px; background: #f0f0f0; }
+        button { padding: 8px 15px; margin: 5px; background: #667eea; color: white; border: none; cursor: pointer; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .error { color: red; }
+        .success { color: green; }
+    </style>
+</head>
+<body>
+    <div id="status">
+        <p>Status: <span id="statusText">Initializing...</span></p>
+        <p>Token: <span id="tokenText">-</span></p>
+        <p>WebSocket: <span id="wsText">Disconnected</span></p>
+        <p>Messages: <span id="msgCount">0</span></p>
+    </div>
+    
+    <div>
+        <button onclick="selectLocation()">Click to Select FROM</button>
+        <button onclick="selectLocation2()">Click to Select TO</button>
+        <button onclick="calculate()">Calculate Route</button>
+        <button onclick="clearAll()">Clear</button>
+    </div>
+    
+    <div id="map"></div>
+
+    <script>
+        let map = null;
+        let token = null;
+        let ws = null;
+        let fromLoc = null;
+        let toLoc = null;
+        let markers = {};
+        let polyline = null;
+        let msgCount = 0;
+
+        async function init() {
+            // Initialize map
+            map = L.map('map').setView([13, 80], 6);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+            
+            // Get token
+            try {
+                const res = await fetch('http://localhost:8010/token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: 'admin', password: 'admin123' })
+                });
+                const data = await res.json();
+                token = data.access_token;
+                document.getElementById('tokenText').textContent = token.substring(0, 20) + '...';
+                
+                // Connect WebSocket
+                const wsUrl = `ws://localhost:8010/ws/optimize?token=${token}`;
+                ws = new WebSocket(wsUrl);
+                
+                ws.onopen = () => {
+                    document.getElementById('wsText').textContent = '✓ Connected';
+                    document.getElementById('wsText').className = 'success';
+                };
+                
+                ws.onmessage = (event) => {
+                    msgCount++;
+                    document.getElementById('msgCount').textContent = msgCount;
+                    const data = JSON.parse(event.data);
+                    console.log('📨 Message:', data.type, data);
+                    handleMessage(data);
+                };
+                
+                ws.onerror = (err) => {
+                    console.error('WS Error:', err);
+                    document.getElementById('wsText').textContent = '✗ Error';
+                    document.getElementById('wsText').className = 'error';
+                };
+                
+                ws.onclose = () => {
+                    document.getElementById('wsText').textContent = 'Disconnected';
+                };
+            } catch (e) {
+                console.error('Init error:', e);
+                document.getElementById('statusText').textContent = 'Error: ' + e.message;
+                document.getElementById('statusText').className = 'error';
+            }
+        }
+
+        function selectLocation() {
+            if (!fromLoc) {
+                map.once('click', (e) => {
+                    fromLoc = e.latlng;
+                    if (markers.from) map.removeLayer(markers.from);
+                    markers.from = L.circleMarker([fromLoc.lat, fromLoc.lng], {radius: 8, color: 'green'}).addTo(map);
+                    console.log('FROM:', fromLoc);
+                });
+            }
+        }
+
+        function selectLocation2() {
+            if (fromLoc && !toLoc) {
+                map.once('click', (e) => {
+                    toLoc = e.latlng;
+                    if (markers.to) map.removeLayer(markers.to);
+                    markers.to = L.circleMarker([toLoc.lat, toLoc.lng], {radius: 8, color: 'red'}).addTo(map);
+                    console.log('TO:', toLoc);
+                });
+            }
+        }
+
+        function calculate() {
+            if (!fromLoc || !toLoc || !ws) {
+                alert('Select both locations and wait for WebSocket');
+                return;
+            }
+            
+            const payload = {
+                type: 'start_optimization',
+                client_job_id: Date.now(),
+                locations: [
+                    { lat: fromLoc.lat, lng: fromLoc.lng },
+                    { lat: toLoc.lat, lng: toLoc.lng }
+                ]
+            };
+            
+            console.log('📤 Sending payload:', JSON.stringify(payload, null, 2));
+            console.log('   FROM:', payload.locations[0]);
+            console.log('   TO:', payload.locations[1]);
+            console.log('   Type:', payload.type);
+            console.log('   Locations count:', payload.locations.length);
+            
+            document.getElementById('statusText').textContent = 'Calculating...';
+            ws.send(JSON.stringify(payload));
+        }
+
+        function handleMessage(data) {
+            if (data.type === 'progress') {
+                const pct = Math.round((data.elapsed / data.total) * 100);
+                document.getElementById('statusText').textContent = `Optimizing ${pct}%...`;
+            } else if (data.type === 'complete') {
+                console.log('🎉 COMPLETE event received!');
+                document.getElementById('statusText').textContent = 'Route Complete!';
+                document.getElementById('statusText').className = 'success';
+                
+                if (data.geometry && data.geometry.length > 0) {
+                    console.log('Drawing geometry with', data.geometry.length, 'points');
+                    if (polyline) map.removeLayer(polyline);
+                    polyline = L.polyline(data.geometry, {color: 'blue', weight: 3}).addTo(map);
+                    map.fitBounds(polyline.getBounds());
+                }
+            } else if (data.type === 'error') {
+                console.error('❌ Error:', data.message);
+                document.getElementById('statusText').textContent = 'Error: ' + data.message;
+                document.getElementById('statusText').className = 'error';
+            }
+        }
+
+        function clearAll() {
+            fromLoc = null;
+            toLoc = null;
+            if (polyline) map.removeLayer(polyline);
+            Object.values(markers).forEach(m => map.removeLayer(m));
+            markers = {};
+            msgCount = 0;
+            document.getElementById('msgCount').textContent = '0';
+            document.getElementById('statusText').textContent = 'Cleared';
+        }
+
+        init();
+    </script>
+</body>
+</html>

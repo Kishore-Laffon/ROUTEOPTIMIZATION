@@ -1,0 +1,61 @@
+# Python virtualenv
+venv/
+.venv/
+env/
+ENV/
+
+# Python compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment variables (SENSITIVE)
+.env
+.env.local
+.env.*.local
+
+# Log files
+*.log
+server_output.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Output/temp files
+out.txt
+output_utf8.txt
+*.tmp
+
+# SQLite databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Archive folders (cleanup artifacts)
+archive_demo/
+archive_temp/
+archive_config/
+archive_tests/
+archive_docs/
+
+# Temporary test files
+test_results.txt
+routes.csv
+
+# Node modules (if any)
+node_modules/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/

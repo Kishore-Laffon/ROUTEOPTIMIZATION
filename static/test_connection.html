@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #0f0; }
+        .log { margin: 5px 0; padding: 5px; border-left: 2px solid #0f0; }
+        .error { border-left-color: #f00; color: #f00; }
+        .success { border-left-color: #0f0; color: #0f0; }
+        .status { font-size: 20px; font-weight: bold; padding: 10px; margin: 10px 0; background: #333; }
+    </style>
+</head>
+<body>
+    <div id="status" class="status">Initializing...</div>
+    <div id="logs"></div>
+
+    <script>
+    const logs = document.getElementById('logs');
+    const status = document.getElementById('status');
+    
+    function log(msg, type = 'info') {
+        const div = document.createElement('div');
+        div.className = 'log ' + type;
+        div.textContent = msg;
+        logs.appendChild(div);
+        console.log(msg);
+    }
+    
+    async function start() {
+        try {
+            log('[1] Clearing storage...', 'info');
+            localStorage.clear();
+            
+            log('[2] Logging in...', 'info');
+            const loginRes = await fetch('http://127.0.0.1:8010/token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: 'admin', password: 'admin123' })
+            });
+            
+            if (!loginRes.ok) {
+                log('[!] Login failed: ' + loginRes.status, 'error');
+                return;
+            }
+            
+            const loginData = await loginRes.json();
+            const token = loginData.access_token;
+            log('[+] Token received', 'success');
+            
+            log('[3] Connecting WebSocket...', 'info');
+            const ws = new WebSocket(`ws://127.0.0.1:8010/ws/optimize?token=${token}`);
+            
+            ws.onopen = () => {
+                log('[+] WebSocket opened', 'success');
+                status.innerHTML = 'WebSocket Opened - Waiting for messages...';
+                status.style.background = '#ff9800';
+            };
+            
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    log(`[<] ${data.type}: ${data.message || ''}`, 'success');
+                    
+                    if (data.type === 'ready') {
+                        log('[SUCCESS] Connected and authenticated!', 'success');
+                        status.innerHTML = '✓ CONNECTED - Ready to optimize';
+                        status.style.background = '#4caf50';
+                    }
+                } catch (e) {
+                    log('[!] Parse error: ' + e.message, 'error');
+                }
+            };
+            
+            ws.onerror = (event) => {
+                log('[!] WebSocket error', 'error');
+                status.innerHTML = 'WebSocket Error';
+                status.style.background = '#f44336';
+            };
+            
+            ws.onclose = (event) => {
+                log(`[!] WebSocket closed (code: ${event.code})`, 'error');
+                status.innerHTML = 'WebSocket Closed';
+                status.style.background = '#f44336';
+            };
+            
+        } catch (e) {
+            log('[!] Exception: ' + e.message, 'error');
+        }
+    }
+    
+    start();
+    </script>
+</body>
+</html>

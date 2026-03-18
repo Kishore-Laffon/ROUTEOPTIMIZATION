@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SupplySense - Real Route Optimizer</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+        }
+        
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+        
+        #map {
+            flex: 1;
+            background: white;
+            position: relative;
+        }
+        
+        .sidebar {
+            width: 420px;
+            background: white;
+            border-left: 1px solid #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            box-shadow: -2px 0 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .header h1 {
+            font-size: 18px;
+            margin: 0;
+        }
+        
+        .header p {
+            font-size: 12px;
+            margin: 5px 0 0 0;
+            opacity: 0.9;
+        }
+        
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .section {
+            margin-bottom: 20px;
+        }
+        
+        .section-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: #999;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        
+        .location-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+        
+        .location-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: #f9f9f9;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 12px;
+        }
+        
+        .location-item.depot {
+            background: #ffe0e0;
+            border-color: #ff6b6b;
+        }
+        
+        .location-coords {
+            color: #666;
+            font-family: monospace;
+            font-size: 11px;
+        }
+        
+        .location-remove {
+            cursor: pointer;
+            color: #999;
+            font-weight: bold;
+            padding: 0 5px;
+        }
+        
+        .location-remove:hover {
+            color: #ff6b6b;
+        }
+        
+        button {
+            padding: 12px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            width: 100%;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #333;
+            border: 1px solid #e0e0e0;
+            width: 100%;
+        }
+        
+        .btn-secondary:hover {
+            background: #eee;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #e0e0e0;
+            border-radius: 2px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        .stat {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #f5f5f5;
+            font-size: 13px;
+        }
+        
+        .stat-value {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .routes-container {
+            flex: 1;
+            overflow-y: auto;
+            margin-top: 15px;
+            padding-right: 5px;
+        }
+        
+        .route-card {
+            padding: 12px;
+            background: #f9f9f9;
+            border-left: 4px solid;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-size: 12px;
+        }
+        
+        .route-title {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .route-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #666;
+        }
+        
+        .color-vehicle-0 { border-left-color: #ff6b6b; }
+        .color-vehicle-1 { border-left-color: #4ecdc4; }
+        .color-vehicle-2 { border-left-color: #ffd93d; }
+        
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .tab-btn {
+            flex: 1;
+            padding: 10px;
+            background: #f0f0f0;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .tab-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .message {
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-bottom: 10px;
+        }
+        
+        .message.info {
+            background: #e3f2fd;
+            color: #1976d2;
+            border-left: 3px solid #1976d2;
+        }
+        
+        .message.success {
+            background: #e8f5e9;
+            color: #388e3c;
+            border-left: 3px solid #388e3c;
+        }
+        
+        .message.error {
+            background: #ffebee;
+            color: #c62828;
+            border-left: 3px solid #c62828;
+        }
+        
+        .control-panel {
+            padding: 10px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .hint {
+            font-size: 11px;
+            color: #999;
+            font-style: italic;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="map"></div>
+        <div class="sidebar">
+            <div class="header">
+                <h1>SupplySense Optimizer</h1>
+                <p>Real OR-Tools Route Optimization</p>
+            </div>
+            
+            <div class="content">
+                <!-- Tabs -->
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="setup">Setup</button>
+                    <button class="tab-btn" data-tab="results">Results</button>
+                </div>
+                
+                <!-- Setup Tab -->
+                <div id="setup-tab" class="tab-content">
+                    <div class="section">
+                        <div class="section-title">Delivery Locations</div>
+                        <div class="message info">Click on map to add stops. First 2 auto-set, rest added manually. Max 10 stops.</div>
+                        
+                        <div class="location-list" id="locationList">
+                        </div>
+                        
+                        <button class="btn-secondary" onclick="clearAllLocations()" style="margin-top: 10px;">
+                            Clear All
+                        </button>
+                    </div>
+                    
+                    <div class="section">
+                        <div class="section-title">Optimization</div>
+                        <div id="progressSection" style="display: none;">
+                            <div id="progressMessage" style="font-size: 12px; margin-bottom: 5px;">Optimizing...</div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progressFill"></div>
+                            </div>
+                        </div>
+                        <button class="btn-primary" id="optimizeBtn" onclick="startOptimization()">
+                            Optimize Routes
+                        </button>
+                        <div class="hint">Hint: Click map to add locations first. Need 2+ stops.</div>
+                    </div>
+                </div>
+                
+                <!-- Results Tab -->
+                <div id="results-tab" class="tab-content" style="display: none;">
+                    <div class="section">
+                        <div class="section-title">Summary</div>
+                        <div class="stat">
+                            <span>Vehicles Used</span>
+                            <span class="stat-value" id="vehiclesUsed">-</span>
+                        </div>
+                        <div class="stat">
+                            <span>Total Stops</span>
+                            <span class="stat-value" id="totalStops">-</span>
+                        </div>
+                        <div class="stat">
+                            <span>Total Distance</span>
+                            <span class="stat-value" id="totalDistance">-</span>
+                        </div>
+                        <button class="btn-secondary" onclick="switchTab('setup')" style="margin-top: 15px;">
+                            Back to Setup
+                        </button>
+                    </div>
+                    
+                    <div class="section">
+                        <div class="section-title">Vehicle Routes</div>
+                        <div class="routes-container" id="routesContainer">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Leaflet JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    
+    <script>
+        // ════════════════════════════════════════════════════════════════
+        // STATE & CONSTANTS
+        // ════════════════════════════════════════════════════════════════
+        
+        let state = {
+            locations: [],
+            routes: [],
+            ws: null,
+            currentJobId: null,
+            mapMarkers: [],
+            routePolylines: []
+        };
+        
+        const VEHICLE_COLORS = ['#ff6b6b', '#4ecdc4', '#ffd93d'];
+        const DEPOT_COLOR = '#667eea';
+        const MAX_STOPS = 10;
+        
+        // ════════════════════════════════════════════════════════════════
+        // INITIALIZE MAP
+        // ════════════════════════════════════════════════════════════════
+        
+        let map = L.map('map').setView([12.9716, 79.1373], 12);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '',
+            maxZoom: 19
+        }).addTo(map);
+        
+        // ════════════════════════════════════════════════════════════════
+        // MAP INTERACTION
+        // ════════════════════════════════════════════════════════════════
+        
+        map.on('click', function(e) {
+            if (state.locations.length >= MAX_STOPS) {
+                showMessage('Max ' + MAX_STOPS + ' stops reached', 'error');
+                return;
+            }
+            
+            const lat = e.latlng.lat;
+            const lng = e.latlng.lng;
+            
+            addLocation(lat, lng);
+        });
+        
+        function addLocation(lat, lng) {
+            const location = {
+                id: state.locations.length,
+                lat: parseFloat(lat.toFixed(6)),
+                lng: parseFloat(lng.toFixed(6)),
+                isDepot: state.locations.length === 0
+            };
+            
+            state.locations.push(location);
+            renderLocations();
+            addMapMarker(location);
+        }
+        
+        function removeLocation(id) {
+            state.locations = state.locations.filter(l => l.id !== id);
+            renderLocations();
+            clearMapMarkers();
+            state.locations.forEach(loc => addMapMarker(loc));
+        }
+        
+        function clearAllLocations() {
+            if (state.locations.length === 0) return;
+            if (!confirm('Clear all ' + state.locations.length + ' locations?')) return;
+            
+            state.locations = [];
+            state.routes = [];
+            renderLocations();
+            clearMapMarkers();
+            clearMapPolylines();
+            switchTab('setup');
+        }
+        
+        function addMapMarker(location) {
+            const marker = L.circleMarker(
+                [location.lat, location.lng],
+                {
+                    radius: 8,
+                    fillColor: location.isDepot ? DEPOT_COLOR : '#667eea',
+                    color: 'white',
+                    weight: 2,
+                    opacity: 1,
+                    fillOpacity: 0.9
+                }
+            ).addTo(map);
+            
+            marker.bindPopup(`<b>${location.isDepot ? 'Depot' : 'Stop ' + location.id}</b><br/>${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`);
+            state.mapMarkers.push(marker);
+        }
+        
+        function clearMapMarkers() {
+            state.mapMarkers.forEach(m => map.removeLayer(m));
+            state.mapMarkers = [];
+        }
+        
+        function clearMapPolylines() {
+            state.routePolylines.forEach(p => map.removeLayer(p));
+            state.routePolylines = [];
+        }
+        
+        // ════════════════════════════════════════════════════════════════
+        // RENDERING
+        // ════════════════════════════════════════════════════════════════
+        
+        function renderLocations() {
+            const list = document.getElementById('locationList');
+            list.innerHTML = '';
+            
+            state.locations.forEach(loc => {
+                const div = document.createElement('div');
+                div.className = 'location-item' + (loc.isDepot ? ' depot' : '');
+                div.innerHTML = `
+                    <div>
+                        <div><strong>${loc.isDepot ? 'DEPOT' : 'Stop ' + loc.id}</strong></div>
+                        <div class="location-coords">${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}</div>
+                    </div>
+                    <span class="location-remove" onclick="removeLocation(${loc.id})">✕</span>
+                `;
+                list.appendChild(div);
+            });
+            
+            document.getElementById('optimizeBtn').disabled = state.locations.length < 2;
+        }
+        
+        function renderRoutes() {
+            const container = document.getElementById('routesContainer');
+            container.innerHTML = '';
+            
+            state.routes.forEach((route, idx) => {
+                const card = document.createElement('div');
+                card.className = 'route-card color-vehicle-' + route.vehicle_id;
+                
+                const stopsText = route.waypoints.length > 1 
+                    ? `${route.waypoints.length - 1} stops`
+                    : '1 stop';
+                
+                card.innerHTML = `
+                    <div class="route-title">${route.vehicle_name}</div>
+                    <div class="route-info">
+                        <span>${stopsText}</span>
+                        <span>${route.distance_km} km</span>
+                        <span>${route.estimated_time_min} min</span>
+                    </div>
+                `;
+                
+                container.appendChild(card);
+            });
+        }
+        
+        function showMessage(text, type) {
+            const container = document.querySelector('.tab-content');
+            const msg = document.createElement('div');
+            msg.className = 'message ' + type;
+            msg.textContent = text;
+            container.insertBefore(msg, container.firstChild);
+            
+            setTimeout(() => msg.remove(), 4000);
+        }
+        
+        // ════════════════════════════════════════════════════════════════
+        // TABS
+        // ════════════════════════════════════════════════════════════════
+        
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
+            
+            document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+            document.getElementById(tabName + '-tab').style.display = 'block';
+        }
+        
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+        });
+        
+        // ════════════════════════════════════════════════════════════════
+        // WEBSOCKET & OPTIMIZATION
+        // ════════════════════════════════════════════════════════════════
+        
+        async function startOptimization() {
+            if (state.locations.length < 2) {
+                showMessage('Need at least 2 locations', 'error');
+                return;
+            }
+            
+            // Ensure connection is open
+            if (!state.ws || state.ws.readyState !== WebSocket.OPEN) {
+                console.log('[OPTIMIZE] WebSocket not open, connecting...');
+                connectWebSocket();
+                
+                // Wait for connection to open
+                let attempts = 0;
+                while ((state.ws.readyState !== WebSocket.OPEN) && attempts < 30) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    attempts++;
+                }
+                
+                if (state.ws.readyState !== WebSocket.OPEN) {
+                    showMessage('Failed to connect to server', 'error');
+                    return;
+                }
+            }
+            
+            clearMapPolylines();
+            state.currentJobId = Date.now();
+            
+            document.getElementById('progressSection').style.display = 'block';
+            document.getElementById('optimizeBtn').disabled = true;
+            
+            console.log('[OPTIMIZE] Sending locations:', state.locations.length);
+            
+            // Send locations
+            try {
+                state.ws.send(JSON.stringify({
+                    type: 'start_optimization',
+                    locations: state.locations,
+                    client_job_id: state.currentJobId
+                }));
+                console.log('[OPTIMIZE] ✓ Message sent');
+            } catch (e) {
+                console.error('[OPTIMIZE] ✗ Send failed:', e);
+                showMessage('Failed to send optimization request', 'error');
+                document.getElementById('progressSection').style.display = 'none';
+                document.getElementById('optimizeBtn').disabled = false;
+            }
+        }
+        
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const url = `${protocol}//${window.location.host}/ws/optimize?token=demo`;
+            
+            try {
+                state.ws = new WebSocket(url);
+                
+                state.ws.onopen = () => {
+                    console.log('[WS] ✓ Connected to', url);
+                };
+                
+                state.ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        console.log('[WS] ✓ Message received:', data.type);
+                        handleWSMessage(data);
+                    } catch (e) {
+                        console.error('[WS] Parse error:', e);
+                    }
+                };
+                
+                state.ws.onerror = (error) => {
+                    console.error('[WS] ✗ Error:', error);
+                };
+                
+                state.ws.onclose = () => {
+                    console.log('[WS] ✗ Closed');
+                };
+            } catch (e) {
+                console.error('[WS] Connection failed:', e);
+                showMessage('Failed to connect to server', 'error');
+            }
+        }
+        
+        function handleWSMessage(data) {
+            const jobId = data.client_job_id;
+            if (jobId && jobId !== state.currentJobId) return;
+            
+            if (data.type === 'ready') {
+                console.log('[WS] Ready');
+            }
+            else if (data.type === 'progress') {
+                const pct = Math.round(data.elapsed * 100);
+                document.getElementById('progressFill').style.width = pct + '%';
+                document.getElementById('progressMessage').textContent = data.message || 'Optimizing...';
+            }
+            else if (data.type === 'complete') {
+                handleOptimizationComplete(data);
+            }
+            else if (data.type === 'error') {
+                showMessage(data.message, 'error');
+                document.getElementById('progressSection').style.display = 'none';
+                document.getElementById('optimizeBtn').disabled = false;
+            }
+        }
+        
+        function handleOptimizationComplete(data) {
+            console.log('[OPTIMIZATION] Complete:', data);
+            
+            // Store routes
+            state.routes = data.routes || [];
+            
+            // Update summary
+            document.getElementById('vehiclesUsed').textContent = data.num_vehicles_used || 0;
+            document.getElementById('totalStops').textContent = data.total_stops || 0;
+            document.getElementById('totalDistance').textContent = (data.total_distance_km || 0).toFixed(1) + ' km';
+            
+            // Render routes
+            renderRoutes();
+            
+            // Draw routes on map
+            drawRoutes();
+            
+            // Hide progress and switch to results
+            document.getElementById('progressSection').style.display = 'none';
+            document.getElementById('optimizeBtn').disabled = false;
+            switchTab('results');
+            
+            showMessage('Optimization complete! ' + data.message, 'success');
+        }
+        
+        function drawRoutes() {
+            clearMapPolylines();
+            
+            let bounds = L.latLngBounds();
+            
+            state.routes.forEach((route, idx) => {
+                const color = VEHICLE_COLORS[route.vehicle_id % VEHICLE_COLORS.length];
+                const coords = route.waypoints.map(w => [w[0], w[1]]);
+                
+                // Draw polyline with smooth curves
+                const polyline = L.polyline(coords, {
+                    color: color,
+                    weight: 4,
+                    opacity: 0.8,
+                    smoothFactor: 0.5,  // Smoother curves through waypoints
+                    lineCap: 'round',
+                    lineJoin: 'round',
+                    dashArray: '5, 5',  // Dashed line to show it's a route
+                    className: 'route-line'
+                }).addTo(map);
+                
+                // Add route label at first stop
+                if (coords.length > 0) {
+                    L.marker(coords[0], {
+                        icon: L.divIcon({
+                            html: `<div style="background: ${color}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">${route.vehicle_name}</div>`,
+                            className: 'route-label',
+                            iconSize: [100, 24]
+                        })
+                    }).addTo(map);
+                }
+                
+                state.routePolylines.push(polyline);
+                coords.forEach(c => bounds.extend(c));
+            });
+            
+            if (bounds.isValid()) {
+                map.fitBounds(bounds, { padding: [80, 80] });
+            }
+        }
+        
+        // ════════════════════════════════════════════════════════════════
+        // INIT
+        // ════════════════════════════════════════════════════════════════
+        
+        renderLocations();
+        connectWebSocket();
+    </script>
+</body>
+</html>

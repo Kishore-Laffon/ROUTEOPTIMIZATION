@@ -1,0 +1,61 @@
+# SupplySense AI Routing Module — requirements.txt
+# Module 3: Route Optimization (OR-Tools CVRPTW)
+# Python 3.12 required
+
+# ── Core API ──────────────────────────────────────────────────────────
+fastapi==0.110.0
+uvicorn[standard]==0.29.0
+pydantic==2.7.0
+pydantic-settings==2.2.1
+
+# ── Database (async — +asyncpg required in DATABASE_URL) ──────────────
+sqlalchemy[asyncio]==2.0.29
+asyncpg==0.29.0
+alembic==1.13.1
+
+# ── Auth ──────────────────────────────────────────────────────────────
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# ── File Upload ───────────────────────────────────────────────────────
+# CRITICAL: FastAPI UploadFile silently fails without this package
+python-multipart==0.0.9
+
+# ── Async Task Queue ──────────────────────────────────────────────────
+# Two packages required: aioredis for FastAPI async, redis for Celery sync
+celery[redis]==5.3.6
+aioredis==2.0.1
+redis==5.0.4
+
+# ── HTTP Client ───────────────────────────────────────────────────────
+# Used for Google Maps Distance Matrix API calls (async)
+httpx==0.27.0
+
+# ── Scheduler ─────────────────────────────────────────────────────────
+APScheduler==3.10.4
+pytz==2024.1
+
+# ── Retry Logic ───────────────────────────────────────────────────────
+tenacity==8.2.3
+
+# ── Alerts ────────────────────────────────────────────────────────────
+twilio==8.13.0
+aiosmtplib==3.0.1
+
+# ── Environment ───────────────────────────────────────────────────────
+python-dotenv==1.0.1
+
+# ── Route Optimization — THE CORE AI ENGINE ───────────────────────────
+# OR-Tools 9.8.3296 — Google's CVRPTW solver
+# Same algorithm class used by Amazon and UPS for delivery routing
+# Peak memory: ~400 MB during 50-stop solve
+# DO NOT change this version — API changed in newer versions
+ortools==9.8.3296
+
+# ── Distance Matrix ───────────────────────────────────────────────────
+# Math for Haversine fallback when Google Maps API is unavailable
+numpy==1.26.4
+
+# ── Testing ───────────────────────────────────────────────────────────
+pytest==8.2.0
+pytest-asyncio==0.23.6

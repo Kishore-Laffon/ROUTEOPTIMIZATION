@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SupplySense - Route Optimization</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+        }
+        
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+        
+        #map {
+            flex: 1;
+            width: 100%;
+            background: #fff;
+        }
+        
+        .sidebar {
+            width: 350px;
+            background: white;
+            border-left: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+            box-shadow: -2px 0 8px rgba(0,0,0,0.1);
+        }
+        
+        .header {
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 18px;
+        }
+        
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
+        .section {
+            margin-bottom: 20px;
+        }
+        
+        .section-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: #999;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+        
+        .stat {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .stat-label {
+            font-size: 13px;
+            color: #666;
+        }
+        
+        .stat-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .status-message {
+            padding: 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .status-connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .status-optimizing {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        button {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            margin-bottom: 15px;
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #f0f0f0;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+        
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Map Container -->
+        <div id="map"></div>
+        
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="header">
+                <h1>SupplySense</h1>
+                <p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.9;">Route Optimization</p>
+            </div>
+            
+            <div class="content">
+                <!-- Status -->
+                <div class="section">
+                    <div id="statusMessage" class="status-message status-optimizing">
+                        Initializing...
+                    </div>
+                </div>
+                
+                <!-- Action Button -->
+                <div class="section">
+                    <button id="startBtn" onclick="startRouteCalculation()">
+                        Calculate Optimal Route
+                    </button>
+                    <div class="progress-bar">
+                        <div id="progressFill" class="progress-bar-fill"></div>
+                    </div>
+                </div>
+                
+                <!-- Results -->
+                <div class="section">
+                    <div class="section-title">Route Results</div>
+                    <div class="stat">
+                        <span class="stat-label">Distance</span>
+                        <span class="stat-value" id="totalDistance">-</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Estimated Time</span>
+                        <span class="stat-value" id="timeElapsed">-</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Status</span>
+                        <span class="stat-value" id="routeStatus">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    
+    <script>
+        // ============ GLOBAL STATE ============
+        let map = null;
+        let ws = null;
+        let token = null;
+        let currentJobId = null;
+        let activeJobId = null;
+        let polyline = null;
+        let markers = {};
+        let fromLocation = null;
+        let toLocation = null;
+        
+        const baseUrl = window.location.origin;
+        const colors = ['#ff4444', '#44ff44', '#4444ff', '#ffaa44', '#ff44aa'];
+        
+        // ============ INITIALIZATION ============
+        window.onload = function() {
+            initializeMap();
+            getToken();
+        };
+        
+        function initializeMap() {
+            // Create map centered on India
+            map = L.map('map').setView([20.5937, 78.9629], 5);
+            
+            // Add tile layer
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© OpenStreetMap'
+            }).addTo(map);
+            
+            // Add click handler for location selection
+            map.on('click', function(e) {
+                selectLocation(e.latlng);
+            });
+            
+            updateStatus('initializing', 'Loading...');
+        }
+        
+        function getToken() {
+            token = localStorage.getItem('supplysense_token');
+            if (!token) {
+                loginAndConnect('admin', 'admin123');
+            } else {
+                connectWebSocket();
+            }
+        }
+        
+        async function loginAndConnect(username, password) {
+            try {
+                const response = await fetch(`${baseUrl}/token`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                token = data.access_token;
+                localStorage.setItem('supplysense_token', token);
+                
+                connectWebSocket();
+            } catch (err) {
+                console.error('[AUTH] Login failed:', err);
+                updateStatus('error', 'Authentication failed');
+            }
+        }
+        
+        function connectWebSocket() {
+            const wsUrl = `ws://${window.location.host}/ws/optimize?token=${token}`;
+            
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = function() {
+                console.log('[WS] Connected');
+            };
+            
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                console.log('[WS] Message:', data.type);
+                handleWebSocketMessage(data);
+            };
+            
+            ws.onerror = function(err) {
+                console.error('[WS] Error:', err);
+                updateStatus('error', 'WebSocket error');
+            };
+            
+            ws.onclose = function() {
+                console.log('[WS] Disconnected');
+                updateStatus('error', 'Disconnected from server');
+                setTimeout(() => connectWebSocket(), 3000);
+            };
+        }
+        
+        function handleWebSocketMessage(data) {
+            // Strict job filtering
+            if (data.type !== 'ready' && data.type !== 'error') {
+                if (!data.job_id) {
+                    console.warn('[WS] Ignoring message without job_id');
+                    return;
+                }
+                
+                if (activeJobId === null && data.job_id) {
+                    activeJobId = data.job_id;
+                    console.log('[WS] Set active job:', activeJobId);
+                }
+                
+                if (data.job_id !== activeJobId) {
+                    console.warn('[WS] Ignoring stale job:', data.job_id, 'vs', activeJobId);
+                    return;
+                }
+            }
+            
+            switch(data.type) {
+                case 'ready':
+                    console.log('[WS] Ready message received');
+                    updateStatus('connected', '✓ Connected - Ready to optimize');
+                    document.getElementById('startBtn').disabled = false;
+                    break;
+                    
+                case 'progress':
+                    const progress = (data.elapsed / data.total) * 100;
+                    document.getElementById('progressFill').style.width = progress + '%';
+                    updateStatus('optimizing', `Routing... ${Math.floor(progress)}%`);
+                    break;
+                    
+                case 'location':
+                    displayLocationMarker(data);
+                    break;
+                    
+                case 'route':
+                case 'route_update':
+                    drawRoute(data);
+                    break;
+                    
+                case 'complete':
+                    console.log('[WS] Complete event received');
+                    console.log('[ROUTE] Waypoints:', data.waypoints);
+                    
+                    // Draw route if we have waypoints
+                    if (data.waypoints && data.waypoints.length > 1) {
+                        drawRoute(data);
+                    }
+                    
+                    // Update results
+                    document.getElementById('totalDistance').textContent = 
+                        (data.distance_km || 0).toFixed(1) + ' km';
+                    document.getElementById('timeElapsed').textContent = 
+                        (data.estimated_time_min || 0).toFixed(0) + ' min';
+                    document.getElementById('routeStatus').textContent = 'Completed';
+                    
+                    updateStatus('complete', '✓ Route optimized!');
+                    document.getElementById('startBtn').disabled = false;
+                    document.getElementById('progressFill').style.width = '100%';
+                    break;
+                    
+                case 'error':
+                    updateStatus('error', '❌ ' + (data.message || 'Routing failed'));
+                    document.getElementById('startBtn').disabled = false;
+                    break;
+            }
+        }
+        
+        function selectLocation(latlng) {
+            const locationName = `Location (${latlng.lat.toFixed(2)}, ${latlng.lng.toFixed(2)})`;
+            
+            if (!fromLocation) {
+                fromLocation = { lat: latlng.lat, lng: latlng.lng, name: 'FROM - ' + locationName };
+                addMarker('from', latlng, 'blue', 'FROM');
+                updateStatus('optimizing', 'FROM location set. Click FOR TO location.');
+            } else if (!toLocation) {
+                toLocation = { lat: latlng.lat, lng: latlng.lng, name: 'TO - ' + locationName };
+                addMarker('to', latlng, 'red', 'TO');
+                updateStatus('optimizing', 'Ready to calculate. Click button.');
+                document.getElementById('startBtn').disabled = false;
+            } else {
+                // Reset and start over
+                hardClearMap();
+                fromLocation = { lat: latlng.lat, lng: latlng.lng, name: 'FROM' };
+                addMarker('from', latlng, 'blue', 'FROM');
+                toLocation = null;
+                updateStatus('optimizing', 'FROM location reset. Click FOR TO location.');
+            }
+        }
+        
+        function addMarker(id, latlng, color, label) {
+            if (markers[id]) {
+                map.removeLayer(markers[id]);
+            }
+            
+            const marker = L.circleMarker(latlng, {
+                radius: 8,
+                fillColor: color,
+                color: '#fff',
+                weight: 2,
+                opacity: 1,
+                fillOpacity: 0.8
+            }).addTo(map);
+            
+            marker.bindPopup(label).openPopup();
+            markers[id] = marker;
+        }
+        
+        function displayLocationMarker(data) {
+            if (data.is_depot) {
+                addMarker('depot', data.coordinates, 'green', data.label);
+            }
+        }
+        
+        async function drawRoute(data) {
+            console.log('[ROUTE] Drawing route...');
+            
+            // Store job ID
+            const jobId = data.job_id;
+            
+            // Check job still active
+            if (jobId && activeJobId && jobId !== activeJobId) {
+                console.log('[ROUTE] Ignoring stale job');
+                return;
+            }
+            
+            // Remove old polyline
+            if (polyline) {
+                map.removeLayer(polyline);
+                polyline = null;
+                console.log('[ROUTE] Old polyline removed');
+            }
+            
+            if (!data.waypoints || data.waypoints.length < 2) {
+                console.log('[ROUTE] No waypoints');
+                return;
+            }
+            
+            try {
+                // Get geometry from OSRM
+                const geometry = await fetchRouteGeometry(data.waypoints);
+                
+                // Check job still active after async call
+                if (jobId && activeJobId && jobId !== activeJobId) {
+                    console.log('[ROUTE] Job invalidated during fetch');
+                    return;
+                }
+                
+                // Draw polyline
+                polyline = L.polyline(geometry, {
+                    color: '#ff0000',
+                    weight: 5,
+                    opacity: 0.8
+                }).addTo(map);
+                
+                console.log('[ROUTE] Polyline drawn with', geometry.length, 'points');
+                
+                // Auto-fit map
+                map.fitBounds(polyline.getBounds(), { padding: [50, 50] });
+                console.log('[ROUTE] Map fitted to bounds');
+                
+            } catch (err) {
+                console.error('[ROUTE] Error drawing route:', err);
+                
+                // Fallback: draw straight line
+                if (data.waypoints && data.waypoints.length >= 2) {
+                    const latLngs = data.waypoints.map(wp => [wp[0], wp[1]]);
+                    polyline = L.polyline(latLngs, {
+                        color: '#ff9999',
+                        weight: 3,
+                        opacity: 0.5,
+                        dashArray: '5, 5'
+                    }).addTo(map);
+                    
+                    map.fitBounds(polyline.getBounds(), { padding: [50, 50] });
+                    console.log('[ROUTE] Fallback straight line drawn');
+                }
+            }
+        }
+        
+        async function fetchRouteGeometry(waypoints) {
+            console.log('[OSRM] Fetching geometry for', waypoints.length, 'waypoints');
+            
+            // Prepare coordinates for OSRM (lon,lat format)
+            const coordStr = waypoints
+                .map(wp => `${wp[1]},${wp[0]}`)  // wp[1]=lng, wp[0]=lat
+                .join(';');
+            
+            console.log('[OSRM] Coord string:', coordStr);
+            
+            const url = `https://router.project-osrm.org/route/v1/driving/${coordStr}?overview=full&geometries=geojson`;
+            
+            const res = await fetch(url);
+            const json = await res.json();
+            
+            if (json.code !== 'Ok') {
+                throw new Error('OSRM error: ' + json.code);
+            }
+            
+            // Extract geometry coordinates
+            const coords = json.routes[0].geometry.coordinates;
+            
+            // Convert from [lng, lat] to [lat, lng] for Leaflet
+            const geometry = coords.map(coord => [coord[1], coord[0]]);
+            
+            console.log('[OSRM] Geometry fetched:', geometry.length, 'points');
+            
+            return geometry;
+        }
+        
+        function startRouteCalculation() {
+            console.log('[START] Calculating route...');
+            
+            if (!fromLocation || !toLocation) {
+                alert('Please select FROM and TO locations on the map');
+                return;
+            }
+            
+            // Reset state
+            currentJobId = Date.now();
+            activeJobId = null;
+            
+            // Clear map
+            hardClearMap();
+            
+            // Send to server
+            const payload = {
+                type: 'start_optimization',
+                mode: 'from_to',
+                client_job_id: currentJobId,
+                from_location: fromLocation,
+                to_location: toLocation
+            };
+            
+            console.log('[WS] Sending request:', payload);
+            ws.send(JSON.stringify(payload));
+            
+            // Update UI
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('progressFill').style.width = '0%';
+            document.getElementById('totalDistance').textContent = '-';
+            document.getElementById('timeElapsed').textContent = '-';
+            document.getElementById('routeStatus').textContent = '-';
+            updateStatus('optimizing', 'Routing... 0%');
+        }
+        
+        function hardClearMap() {
+            console.log('[MAP] Hard clearing map');
+            
+            // Remove polyline
+            if (polyline) {
+                map.removeLayer(polyline);
+                polyline = null;
+            }
+            
+            // Remove all markers except depot
+            Object.keys(markers).forEach(key => {
+                if (key !== 'from' && key !== 'to') {
+                    map.removeLayer(markers[key]);
+                    delete markers[key];
+                }
+            });
+            
+            // Reset progress
+            document.getElementById('progressFill').style.width = '0%';
+            document.getElementById('routeStatus').textContent = '-';
+        }
+        
+        function updateStatus(type, message) {
+            const msgEl = document.getElementById('statusMessage');
+            msgEl.textContent = message;
+            msgEl.className = 'status-message status-' + type;
+        }
+    </script>
+</body>
+</html>

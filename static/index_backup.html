@@ -1,0 +1,1721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SupplySense - Live Route Optimization</title>
+    
+    <!-- Leaflet CSS for maps -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+        }
+        
+        .container {
+            display: flex;
+            height: 100vh;
+            gap: 0;
+        }
+        
+        .map-container {
+            flex: 1;
+            position: relative;
+            background: white;
+        }
+        
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .sidebar {
+            width: 350px;
+            background: white;
+            border-left: 1px solid #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: -2px 0 8px rgba(0,0,0,0.1);
+        }
+        
+        .header {
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .header h1 {
+            font-size: 20px;
+            margin-bottom: 5px;
+        }
+        
+        .header p {
+            font-size: 13px;
+            opacity: 0.9;
+        }
+        
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
+        .section {
+            margin-bottom: 25px;
+        }
+        
+        .section-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: #999;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
+        
+        .stat {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .stat-label {
+            font-size: 13px;
+            color: #666;
+        }
+        
+        .stat-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .stat-value.success {
+            color: #4caf50;
+        }
+        
+        .stat-value.warning {
+            color: #ff9800;
+        }
+        
+        .progress-container {
+            margin: 15px 0;
+        }
+        
+        .progress-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+            border-radius: 4px;
+        }
+        
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            margin-bottom: 15px;
+        }
+        
+        .status.initializing {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        
+        .status.ready {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+        
+        .status.connected {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+        
+        .status.disconnected {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+        
+        .status.optimizing {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+        
+        .status.complete {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+        
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .status.initializing .status-indicator {
+            background: #1976d2;
+        }
+        
+        .status.ready .status-indicator {
+            background: #388e3c;
+        }
+        
+        .status.connected .status-indicator {
+            background: #388e3c;
+        }
+        
+        .status.disconnected .status-indicator {
+            background: #f57c00;
+        }
+        
+        .status.optimizing .status-indicator {
+            background: #f57c00;
+        }
+        
+        .status.complete .status-indicator {
+            background: #388e3c;
+        }
+        
+        .status.error .status-indicator {
+            background: #c62828;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .routes-list {
+            max-height: 250px;
+            overflow-y: auto;
+        }
+        
+        .route-item {
+            padding: 12px;
+            background: #f9f9f9;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .route-name {
+            font-weight: 600;
+            font-size: 13px;
+            color: #333;
+            margin-bottom: 4px;
+        }
+        
+        .route-detail {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 2px;
+        }
+        
+        .control-panel {
+            padding: 20px;
+            border-top: 1px solid #e0e0e0;
+            background: #fafafa;
+        }
+        
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+            margin-bottom: 10px;
+        }
+        
+        button {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s ease;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .connection-status {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 8px 12px;
+            background: white;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        
+        .connection-status.connected {
+            color: #4caf50;
+        }
+        
+        .connection-status.disconnected {
+            color: #f44336;
+        }
+        
+        .connection-indicator {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+        }
+        
+        .connection-status.connected .connection-indicator {
+            background: #4caf50;
+        }
+        
+        .connection-status.disconnected .connection-indicator {
+            background: #f44336;
+        }
+        
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            z-index: 999;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        
+        .legend-item:last-child {
+            margin-bottom: 0;
+        }
+        
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+        }
+        
+        .scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        
+        .scrollbar::-webkit-scrollbar-thumb {
+            background: #bbb;
+            border-radius: 3px;
+        }
+        
+        .scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #888;
+        }
+        
+        .content {
+            scrollbar-width: thin;
+            scrollbar-color: #bbb #f1f1f1;
+        }
+        
+        .routes-list {
+            scrollbar-width: thin;
+            scrollbar-color: #bbb #f1f1f1;
+        }
+        
+        /* Location Selection Modal */
+        .location-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .location-modal.active {
+            display: flex;
+        }
+        
+        .location-modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .location-modal-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        
+        .location-modal-subtitle {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 16px;
+        }
+        
+        .location-option {
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+        
+        .location-option:hover {
+            background: #f5f5f5;
+            border-color: #667eea;
+        }
+        
+        .location-option.selected {
+            background: #667eea;
+            border-color: #667eea;
+            color: white;
+        }
+        
+        .location-option-radio {
+            margin-top: 3px;
+            min-width: 20px;
+        }
+        
+        .location-option-info {
+            flex: 1;
+        }
+        
+        .location-option-name {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 2px;
+        }
+        
+        .location-option-address {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-bottom: 2px;
+        }
+        
+        .location-option-distance {
+            font-size: 11px;
+            opacity: 0.7;
+        }
+        
+        .location-modal-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+        }
+        
+        .location-modal-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .location-modal-btn.primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .location-modal-btn.primary:hover {
+            opacity: 0.9;
+        }
+        
+        .location-modal-btn.secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+        
+        .location-modal-btn.secondary:hover {
+            background: #e0e0e0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="map-container">
+            <div id="map"></div>
+            <div class="connection-status disconnected" id="connectionStatus">
+                <div class="connection-indicator"></div>
+                <span>Disconnected</span>
+            </div>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #667eea;"></div>
+                    <span>Route 1</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #764ba2;"></div>
+                    <span>Route 2</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #4caf50;"></div>
+                    <span>Delivery</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ff9800;"></div>
+                    <span>Depot</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="sidebar scrollbar">
+            <div class="header">
+                <h1>SupplySense Live</h1>
+                <p>Real-time Route Optimization</p>
+            </div>
+            
+            <div class="content scrollbar">
+                <!-- Status Section -->
+                <div class="section">
+                    <div class="status initializing" id="status">
+                        <div class="status-indicator"></div>
+                        <span id="statusText">Waiting to connect...</span>
+                    </div>
+                </div>
+                
+                <!-- Controls Section -->
+                <div class="section">
+                    <div class="section-title">Plan Route</div>
+                    
+                    <div style="margin-bottom: 12px;">
+                        <label style="font-size: 12px; color: #666;">📍 From Location (City/Place Name)</label>
+                        <input type="text" id="fromLocation" placeholder="e.g., Chennai, Bangalore, Hosur" style="width: 100%; padding: 8px; margin-top: 4px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;">
+                        <input type="text" id="fromCoords" placeholder="Optional: 12.9716, 79.1599" style="width: 100%; padding: 8px; margin-top: 4px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px; background: #f5f5f5; color: #999;">
+                    </div>
+                    
+                    <div style="margin-bottom: 12px;">
+                        <label style="font-size: 12px; color: #666;">📍 To Location (City/Place Name)</label>
+                        <input type="text" id="toLocation" placeholder="e.g., Bangalore, Coimbatore, Salem" style="width: 100%; padding: 8px; margin-top: 4px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;">
+                        <input type="text" id="toCoords" placeholder="Optional: 13.0827, 80.2707" style="width: 100%; padding: 8px; margin-top: 4px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px; background: #f5f5f5; color: #999;">
+                    </div>
+                    
+                    <input type="date" id="deliveryDate" value="2026-03-14" style="width: 100%; padding: 8px; margin-bottom: 12px; border: 1px solid #ddd; border-radius: 4px;">
+                    
+                    <button id="startBtn" onclick="startOptimization()" style="width: 100%; padding: 10px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 4px; font-weight: 600; cursor: pointer; font-size: 14px;">Calculate Optimal Route</button>
+                </div>
+                
+                <!-- Progress Section -->
+                <div class="section">
+                    <div class="section-title">Progress</div>
+                    <div class="progress-container">
+                        <div class="progress-label">
+                            <span>Time Elapsed</span>
+                            <span id="timeElapsed">0s</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Results Section -->
+                <div class="section">
+                    <div class="section-title">Results</div>
+                    <div class="stat">
+                        <span class="stat-label">Total Distance</span>
+                        <span class="stat-value" id="totalDistance">-</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Routes</span>
+                        <span class="stat-value" id="routeCount">-</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Vehicles Used</span>
+                        <span class="stat-value" id="vehicleCount">-</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Orders Routed</span>
+                        <span class="stat-value" id="orderCount">-</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Job ID</span>
+                        <span class="stat-value" id="jobId" style="font-size: 12px; font-family: monospace;">-</span>
+                    </div>
+                </div>
+                
+                <!-- Routes Section -->
+                <div class="section">
+                    <div class="section-title">Routes</div>
+                    <div class="routes-list scrollbar" id="routesList">
+                        <p style="color: #999; font-size: 12px;">No routes yet</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Leaflet JS for maps -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    
+    <script>
+        // Initialize map
+        let map = L.map('map').setView([12.9716, 79.1599], 10);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 19
+        }).addTo(map);
+        
+        // WebSocket connection
+        let ws = null;
+        let token = null;
+        let markers = {};
+        let polylines = [];
+        const colors = ['#667eea', '#764ba2', '#f44336', '#ff9800', '#4caf50'];
+        const baseUrl = `${window.location.protocol}//${window.location.host}`;
+        
+        // ===== JOB-BASED FILTERING (CRITICAL for preventing stale routes) =====
+        let activeJobId = null;  // Track the current active job from backend
+        let currentJobId = null;  // Track the job ID for THIS request (client-generated)
+        let routingTimeoutId = null;  // Track timeout to prevent UI freeze
+        
+        // ===== STATE MANAGEMENT (React-equivalent patterns) =====
+        let routeState = {
+            currentRoute: null,           // Current route data from server
+            isLoading: false,             // Loading state
+            layerRefs: {
+                firstPolyline: null,      // Ref to main route polyline
+                startMarker: null,        // Ref to start marker
+                endMarker: null           // Ref to end marker
+            },
+            lastRequestId: null,          // Track last request to prevent stale updates
+            requestCounter: 0,            // Increment on each new request
+            routingStartTime: null        // Track when routing started
+        };
+        
+        // Function to get next request ID (ensures fresh calls)
+        function getNextRequestId() {
+            routeState.requestCounter++;
+            routeState.lastRequestId = routeState.requestCounter;
+            return routeState.requestCounter;
+        }
+        
+        // Function to check if response is stale
+        function isRequestStale(requestId) {
+            if (requestId !== routeState.lastRequestId) {
+                console.warn('[STATE] Stale request detected (ID:', requestId, 'vs', routeState.lastRequestId + ')');
+                return true;
+            }
+            return false;
+        }
+        
+        // COMPREHENSIVE MAP CLEARING FUNCTION (with state management)
+        function clearMapState() {
+            console.log('[MAP] ========== CLEARING MAP STATE ==========');
+            console.log('[MAP] Current state before clear:', {
+                polylines: polylines.length,
+                markers: Object.keys(markers).length,
+                layerRefs: routeState.layerRefs
+            });
+            
+            // 1. Remove primary route polyline via ref
+            if (routeState.layerRefs.firstPolyline) {
+                try {
+                    if (map.hasLayer(routeState.layerRefs.firstPolyline)) {
+                        map.removeLayer(routeState.layerRefs.firstPolyline);
+                        console.log('[MAP]   ✓ Removed primary route polyline via ref');
+                    }
+                } catch(e) {
+                    console.warn('[MAP]   ? Error removing refs polyline:', e.message);
+                }
+                routeState.layerRefs.firstPolyline = null;
+            }
+            
+            // 2. Remove all polylines (comprehensive cleanup)
+            console.log('[MAP] Removing polylines:', polylines.length);
+            polylines.forEach((polyline, idx) => {
+                try {
+                    if (map.hasLayer(polyline)) {
+                        map.removeLayer(polyline);
+                        console.log('[MAP]   ✓ Removed polyline', idx);
+                    }
+                } catch(e) {
+                    console.warn('[MAP]   ? Error removing polyline:', e.message);
+                }
+            });
+            polylines = []; // Reset array
+            
+            // 3. Remove start/end markers via refs
+            if (routeState.layerRefs.startMarker) {
+                try {
+                    if (map.hasLayer(routeState.layerRefs.startMarker)) {
+                        map.removeLayer(routeState.layerRefs.startMarker);
+                        console.log('[MAP]   ✓ Removed start marker via ref');
+                    }
+                } catch(e) {
+                    console.warn('[MAP]   ? Error removing start marker:', e.message);
+                }
+                routeState.layerRefs.startMarker = null;
+            }
+            
+            if (routeState.layerRefs.endMarker) {
+                try {
+                    if (map.hasLayer(routeState.layerRefs.endMarker)) {
+                        map.removeLayer(routeState.layerRefs.endMarker);
+                        console.log('[MAP]   ✓ Removed end marker via ref');
+                    }
+                } catch(e) {
+                    console.warn('[MAP]   ? Error removing end marker:', e.message);
+                }
+                routeState.layerRefs.endMarker = null;
+            }
+            
+            // 4. Remove all other markers (comprehensive)
+            console.log('[MAP] Removing markers:', Object.keys(markers).length);
+            Object.keys(markers).forEach(key => {
+                try {
+                    if (map.hasLayer(markers[key])) {
+                        map.removeLayer(markers[key]);
+                        console.log('[MAP]   ✓ Removed marker:', key);
+                    }
+                } catch(e) {
+                    console.warn('[MAP]   ? Error removing marker:', e.message);
+                }
+            });
+            markers = {}; // Reset object
+            
+            // 5. Reset route state
+            routeState.currentRoute = null;
+            routeState.isLoading = false;
+            
+            // 6. Clear all text displays
+            document.getElementById('totalDistance').textContent = '-';
+            document.getElementById('timeElapsed').textContent = '-';
+            document.getElementById('routeCount').textContent = '-';
+            document.getElementById('vehicleCount').textContent = '-';
+            document.getElementById('orderCount').textContent = '-';
+            document.getElementById('jobId').textContent = '-';
+            document.getElementById('routesList').innerHTML = '';
+            
+            // 7. Reset progress bar
+            const progressFill = document.getElementById('progressFill');
+            if (progressFill) {
+                progressFill.style.width = '0%';
+                progressFill.style.background = 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)';
+            }
+            
+            console.log('[MAP] ========== MAP CLEAR COMPLETE ==========');
+        }
+        
+        // HARD CLEAR MAP - Nuclear option that removes ALL layers
+        // This ensures absolutely no old routes remain, regardless of state
+        function hardClearMap() {
+            console.log('[MAP] 🚨 ========== HARD MAP RESET (NUCLEAR) ==========');
+            
+            // 1. Remove all layers via Leaflet's built-in eachLayer
+            map.eachLayer(layer => {
+                if (
+                    layer instanceof L.Polyline ||
+                    layer instanceof L.Marker ||
+                    layer instanceof L.Circle
+                ) {
+                    try {
+                        map.removeLayer(layer);
+                        console.log('[MAP]   ✓ Removed layer:', layer.constructor.name);
+                    } catch(e) {
+                        console.warn('[MAP]   ? Error removing layer:', e.message);
+                    }
+                }
+            });
+            
+            // 2. Reset all data structures
+            polylines = [];
+            markers = {};
+            routeState.layerRefs = {
+                firstPolyline: null,
+                startMarker: null,
+                endMarker: null
+            };
+            routeState.currentRoute = null;
+            routeState.isLoading = false;
+            
+            // 3. Clear all UI displays
+            document.getElementById('totalDistance').textContent = '-';
+            document.getElementById('timeElapsed').textContent = '-';
+            document.getElementById('routeCount').textContent = '-';
+            document.getElementById('vehicleCount').textContent = '-';
+            document.getElementById('orderCount').textContent = '-';
+            document.getElementById('jobId').textContent = '-';
+            document.getElementById('routesList').innerHTML = '';
+            
+            // 4. Reset progress
+            const progressFill = document.getElementById('progressFill');
+            if (progressFill) {
+                progressFill.style.width = '0%';
+                progressFill.style.background = 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)';
+            }
+            
+            console.log('[MAP] 🚨 ========== HARD MAP RESET COMPLETE ==========');
+        }
+        
+        // Get token from localStorage or login
+        async function getToken() {
+            token = localStorage.getItem('supplysense_token');
+            if (!token) {
+                console.log('[INIT] No token, logging in...');
+                updateStatus('initializing', 'Logging in...');
+                await loginAndConnect('admin', 'admin123');
+            } else {
+                console.log('[INIT] Token found, connecting...');
+                connectWebSocket();
+            }
+        }
+        
+        // Login function
+        async function loginAndConnect(username, password) {
+            try {
+                console.log('[AUTH] Logging in as:', username);
+                updateStatus('initializing', `🔐 Authenticating...`);
+                const response = await fetch(`${baseUrl}/token`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    token = data.access_token;
+                    localStorage.setItem('supplysense_token', token);
+                    console.log('[AUTH] Login OK, token stored');
+                    connectWebSocket();
+                } else {
+                    const error = await response.json();
+                    console.error('[AUTH] Failed:', error);
+                    updateStatus('error', '❌ Login failed');
+                }
+            } catch (error) {
+                console.error('[AUTH] Error:', error);
+                updateStatus('error', '❌ Login error');
+            }
+        }
+        
+        // Connect WebSocket
+        function connectWebSocket() {
+            if (!token) {
+                updateStatus('error', '❌ No token');
+                return;
+            }
+            
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/optimize?token=${token}`;
+            console.log('[WS] Connecting to:', wsUrl.substring(0, 60) + '...');
+            updateStatus('initializing', '🔄 Connecting...');
+            
+            try {
+                ws = new WebSocket(wsUrl);
+                
+                ws.onopen = () => {
+                    console.log('[WS] Socket opened');
+                    updateStatus('initializing', 'Waiting for ready...');
+                };
+                
+                ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        console.log('[WS] Received:', data.type);
+                        handleWebSocketMessage(data);
+                    } catch (e) {
+                        console.error('[WS] Parse error:', e);
+                    }
+                };
+                
+                ws.onerror = (error) => {
+                    console.error('[WS] Error:', error);
+                    updateStatus('error', '❌ Error');
+                    updateConnectionStatus(false);
+                };
+                
+                ws.onclose = (event) => {
+                    console.log('[WS] Closed. Code:', event.code, 'Clean:', event.wasClean);
+                    updateConnectionStatus(false);
+                    updateStatus('disconnected', '⏳ Reconnecting...');
+                    setTimeout(() => {
+                        if (!ws || ws.readyState === WebSocket.CLOSED) {
+                            console.log('[WS] Attempting reconnect...');
+                            connectWebSocket();
+                        }
+                    }, 3000);
+                };
+                
+                console.log('[WS] Handler set, waiting for connection...');
+            } catch (error) {
+                console.error('[WS] Exception:', error);
+                updateStatus('error', '❌ Failed');
+            }
+        }
+        
+        // Handle incoming WebSocket messages
+        function handleWebSocketMessage(data) {
+            console.log('[WS] Message received:', data.type, 'job_id:', data.job_id, 'client_job_id:', data.client_job_id);
+            
+            // ===== STRICT JOB-BASED FILTERING =====
+            // Messages must be from the CURRENT request
+            if (data.type !== 'ready' && data.type !== 'error') {
+                // For route/progress/complete messages, they MUST have a job_id
+                if (!data.job_id) {
+                    console.warn('[WS] 🚨 IGNORING MESSAGE WITHOUT job_id:', data.type);
+                    return;
+                }
+                
+                // First message with job_id for this request sets the active job
+                if (activeJobId === null) {
+                    activeJobId = data.job_id;
+                    console.log('[WS] 🟢 SET ACTIVE JOB ID:', activeJobId, '(from client_id:', data.client_job_id + ')');
+                }
+                
+                // STRICT: Ignore ALL messages from OLD jobs
+                if (data.job_id !== activeJobId) {
+                    console.warn('[WS] 🚨 IGNORING STALE JOB MESSAGE - old_job:', data.job_id, 'active:', activeJobId);
+                    return;
+                }
+            }
+            
+            switch(data.type) {
+                case 'ready':
+                    console.log('[WS] Got ready message');
+                    updateConnectionStatus(true);
+                    updateStatus('connected', '✓ Connected - Ready to optimize');
+                    console.log('[WS] Status updated to connected');
+                    break;
+                case 'progress':
+                    // Job filter already applied above
+                    updateProgress(data);
+                    break;
+                case 'location':
+                    // Job filter already applied above
+                    updateLocation(data);
+                    break;
+                case 'route':
+                    console.log('[WS] Route message from job:', data.job_id);
+                    updateRoute(data);
+                    break;
+                case 'route_update':
+                    console.log('[WS] Route update message from job:', data.job_id);
+                    updateRoute(data);
+                    if (data.message) {
+                        updateStatus('optimizing', `✓ ${data.message}`);
+                    }
+                    break;
+                case 'complete':
+                    console.log('[WS] Complete message from job:', data.job_id);
+                    console.log('[ROUTE] Waypoints received from complete event:', data.waypoints);
+                    // Cancel timeout since we got response
+                    if (routingTimeoutId) {
+                        clearTimeout(routingTimeoutId);
+                        routingTimeoutId = null;
+                    }
+                    updateComplete(data);
+                    // ✅ CRITICAL: Draw route on map from waypoints
+                    console.log('[ROUTE] Drawing route on map from complete event...');
+                    updateRoute(data);
+                    document.getElementById('startBtn').disabled = false;
+                    routeState.isLoading = false;
+                    console.log('[WS] ✓ Button re-enabled, routing complete');
+                    break;
+                case 'error':
+                    // Cancel timeout on error
+                    if (routingTimeoutId) {
+                        clearTimeout(routingTimeoutId);
+                        routingTimeoutId = null;
+                    }
+                    updateStatus('error', '❌ ' + data.message);
+                    document.getElementById('startBtn').disabled = false;
+                    routeState.isLoading = false;
+                    activeJobId = null;  // Invalidate job
+                    console.log('[WS] ✓ Button re-enabled, error received');
+                    break;
+                default:
+                    console.log('[WS] Unknown:', data.type);
+            }
+        }
+        
+        // Update progress
+        function updateProgress(data) {
+            const status = data.status || 'optimizing';
+            const message = data.message || `Optimizing... ${data.elapsed.toFixed(1)}s / ${data.total}s`;
+            
+            // Handle different statuses
+            if (status === 'delay_detected') {
+                updateStatus('optimizing', `⚠️  ${message}`);
+                // Flash red notification
+                const progressFill = document.getElementById('progressFill');
+                progressFill.style.background = 'linear-gradient(90deg, #ff6b6b 0%, #ff8787 100%)';
+            } else {
+                updateStatus('optimizing', message);
+                // Reset to normal color
+                const progressFill = document.getElementById('progressFill');
+                progressFill.style.background = 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)';
+            }
+            
+            const percent = (data.elapsed / data.total) * 100;
+            const progressFill = document.getElementById('progressFill');
+            progressFill.style.width = Math.min(percent, 100) + '%';
+            document.getElementById('timeElapsed').textContent = data.elapsed.toFixed(1) + 's';
+            
+            // Show recalculation count if available
+            if (data.recalculation_count) {
+                document.getElementById('routesList').innerHTML = `<p style="color: #ff9800; font-size: 12px;">Recalculations: ${data.recalculation_count}</p>`;
+            }
+        }
+        
+        // Update location on map
+        function updateLocation(data) {
+            const key = data.location_id;
+            const lat = data.coordinates[0];
+            const lng = data.coordinates[1];
+            const isDepot = data.is_depot;
+            
+            // Remove old marker if exists
+            if (markers[key]) {
+                map.removeLayer(markers[key]);
+            }
+            
+            // Create new marker
+            const color = isDepot ? '#ff9800' : '#4caf50';
+            const markerIcon = L.divIcon({
+                className: 'custom-marker',
+                html: `<div style="background: ${color}; width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: bold;">${isDepot ? '📍' : '📦'}</div>`,
+                iconSize: [28, 28],
+                popupAnchor: [0, 0]
+            });
+            
+            const marker = L.marker([lat, lng], { icon: markerIcon })
+                .bindPopup(`<b>${data.label}</b><br/>ID: ${key}`)
+                .addTo(map);
+            
+            markers[key] = marker;
+        }
+        
+        // Fetch real road geometry using OSRM so the map is not a straight line
+        async function fetchRouteGeometry(waypoints) {
+            const coordStr = waypoints.map(wp => `${wp[1]},${wp[0]}`).join(';'); // OSRM expects lng,lat
+            const url = `https://router.project-osrm.org/route/v1/driving/${coordStr}?overview=full&geometries=geojson`;
+            const res = await fetch(url);
+            const body = await res.json();
+            if (body.code !== 'Ok' || !body.routes || !body.routes[0]) {
+                throw new Error('OSRM routing failed');
+            }
+            const route = body.routes[0];
+            const geometry = route.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+            return {
+                geometry,
+                distanceKm: (route.distance || 0) / 1000,
+                durationMin: (route.duration || 0) / 60
+            };
+        }
+        
+        // Update route visualization (always fetch real road geometry first)
+        async function updateRoute(data) {
+            console.log('[ROUTE] ========== NEW ROUTE UPDATE ==========');
+            console.log('[ROUTE] Job ID:', data.job_id, 'Active:', activeJobId);
+            console.log('[ROUTE] Waypoints:', data.waypoints ? data.waypoints.length : 0);
+            
+            // ===== CRITICAL: STORE JOB ID BEFORE ASYNC CALL =====
+            const jobId = data.job_id;
+            
+            // ===== PREVENT RENDERING STALE DATA FROM OLD JOBS =====
+            // Only reject if:
+            // 1. Both have job_id AND they don't match
+            // 2. Otherwise, allow (helps with fallback mode)
+            if (jobId && activeJobId && jobId !== activeJobId) {
+                console.warn('[ROUTE] REJECTED: Stale route update from old job (job_id:', jobId, 'active:', activeJobId + ')');
+                return;
+            }
+            
+            // ALWAYS CLEAR OLD POLYLINES FIRST (via hard reset)
+            console.log('[ROUTE] Clearing old routes before rendering new one');
+            polylines.forEach((polyline, idx) => {
+                try {
+                    if (map && map.hasLayer(polyline)) {
+                        map.removeLayer(polyline);
+                        console.log('[ROUTE]   ✓ Removed polyline', idx);
+                    }
+                } catch(e) {
+                    console.warn('[ROUTE]   ? Error removing polyline:', e.message);
+                }
+            });
+            polylines = []; // Reset array - single route only
+            routeState.layerRefs.firstPolyline = null;  // Clear ref
+            
+            const routeNum = data.route_index % colors.length;
+            const color = colors[routeNum];
+            
+            if (data.waypoints && data.waypoints.length > 1) {
+                try {
+                    console.log('[ROUTE] Fetching road geometry from OSRM...');
+                    // Always try to fetch road-following geometry client-side (fresh API call with no cache)
+                    let routed = await fetchRouteGeometry(data.waypoints);
+                    
+                    // ✅ CRITICAL FIX: CHECK JOB STILL ACTIVE AFTER AWAIT
+                    // This prevents old async responses from rendering when newer jobs have been requested
+                    // Only reject if both have job_id AND they don't match
+                    if (jobId && activeJobId && jobId !== activeJobId) {
+                        console.warn('[ROUTE] 🚨 IGNORED STALE ASYNC RESPONSE - newer job arrived (old_job:', jobId, 'new_job:', activeJobId + ')');
+                        return;
+                    }
+                    
+                    // If server already sent distance/time, keep them
+                    if (data.distance_km) routed.distanceKm = data.distance_km;
+                    if (data.estimated_time_min) routed.durationMin = data.estimated_time_min;
+                    
+                    console.log('[ROUTE] Drawing polyline with', routed.geometry.length, 'points');
+                    const polyline = L.polyline(routed.geometry, {
+                        color: color,
+                        weight: 4,
+                        opacity: 0.8
+                    }).addTo(map);
+                    polylines.push(polyline);
+                    
+                    // ===== STORE REFERENCE TO PREVENT DUPLICATES =====
+                    routeState.layerRefs.firstPolyline = polyline;
+                    console.log('[ROUTE] ✓ Stored only route polyline (preventing duplicates)');
+                    
+                    // Center map to new route (auto-fit)
+                    try {
+                        const bounds = polyline.getBounds();
+                        map.fitBounds(bounds, { padding: [50, 50] });
+                        console.log('[ROUTE] Map auto-fitted to new route bounds');
+                    } catch(e) {
+                        console.warn('[ROUTE] Could not fit bounds:', e.message);
+                    }
+                    
+                    const distVal = routed.distanceKm || routed.distance_km || 0;
+                    const timeVal = routed.durationMin || routed.duration_min || 0;
+                    document.getElementById('totalDistance').textContent = `${distVal.toFixed(1)} km`;
+                    document.getElementById('timeElapsed').textContent = `${timeVal.toFixed(0)} min est.`;
+                    
+                    // ===== UPDATE ROUTE STATE (mirrors React state pattern) =====
+                    routeState.currentRoute = {
+                        geometry: routed.geometry,
+                        distance: distVal,
+                        time: timeVal,
+                        waypoints: data.waypoints,
+                        timestamp: Date.now()
+                    };
+                    console.log('[ROUTE] Route state updated:', routeState.currentRoute);
+                    
+                    console.log('[ROUTE] ✓ Route displayed: ' + distVal.toFixed(1) + 'km, ' + timeVal.toFixed(0) + ' min');
+                    console.log('[ROUTE] ========== ROUTE UPDATE COMPLETE ==========');
+                } catch (err) {
+                    console.warn('[ROUTE] OSRM fetch failed, trying server geometry:', err.message);
+                    
+                    // ✅ CRITICAL FIX: Check job still active in catch block too
+                    // Only reject if both have job_id AND they don't match
+                    if (jobId && activeJobId && jobId !== activeJobId) {
+                        console.warn('[ROUTE] 🚨 IGNORED STALE SERVER GEOMETRY - newer job arrived (old_job:', jobId, 'new_job:', activeJobId + ')');
+                        return;
+                    }
+                    
+                    // Try server-provided geometry next
+                    if (data.geometry && data.geometry.length > 1) {
+                        console.log('[ROUTE] Using server geometry with', data.geometry.length, 'points');
+                        const polyline = L.polyline(data.geometry, {
+                            color: color,
+                            weight: 4,
+                            opacity: 0.8
+                        }).addTo(map);
+                        polylines.push(polyline);
+                        routeState.layerRefs.firstPolyline = polyline;
+                        
+                        try {
+                            const bounds = polyline.getBounds();
+                            map.fitBounds(bounds, { padding: [50, 50] });
+                        } catch(e) {}
+                        
+                        const distVal = data.distance_km || data.distanceKm || 0;
+                        const timeVal = data.estimated_time_min || data.durationMin || 0;
+                        document.getElementById('totalDistance').textContent = `${distVal.toFixed(1)} km`;
+                        document.getElementById('timeElapsed').textContent = `${timeVal.toFixed(0)} min est.`;
+                        
+                        routeState.currentRoute = {
+                            geometry: data.geometry,
+                            distance: distVal,
+                            time: timeVal,
+                            waypoints: data.waypoints,
+                            timestamp: Date.now()
+                        };
+                        console.log('[ROUTE] ========== ROUTE UPDATE COMPLETE ==========');
+                        return;
+                    }
+                    // Last resort: draw straight segments
+                    console.warn('[ROUTE] Fallback to straight line segments');
+                    const latLngs = data.waypoints.map(wp => [wp[0], wp[1]]);
+                    const polyline = L.polyline(latLngs, {
+                        color: color,
+                        weight: 3,
+                        opacity: 0.6,
+                        dashArray: '5, 5'
+                    }).addTo(map);
+                    polylines.push(polyline);
+                    routeState.layerRefs.firstPolyline = polyline;
+                    
+                    try {
+                        const bounds = polyline.getBounds();
+                        map.fitBounds(bounds, { padding: [50, 50] });
+                    } catch(e) {}
+                    console.log('[ROUTE] ========== ROUTE UPDATE COMPLETE (fallback) ==========');
+                }
+            }
+        }
+        
+        // Update completion
+        function updateComplete(data) {
+            updateStatus('complete', data.message || 'Route optimized!');
+            
+            // Update stats
+            document.getElementById('totalDistance').textContent = (data.distance_km || data.total_distance_km || 0).toFixed(1) + ' km';
+            document.getElementById('routeCount').textContent = data.routes_count || 1;
+            document.getElementById('vehicleCount').textContent = data.vehicles_used || 1;
+            document.getElementById('orderCount').textContent = data.orders_routed || 0;
+            document.getElementById('jobId').textContent = data.job_id || '-';
+            
+            // Display route details
+            const routesList = document.getElementById('routesList');
+            routesList.innerHTML = '';
+            
+            // Show from/to if available
+            if (data.from_location || data.to_location) {
+                const locationDiv = document.createElement('div');
+                locationDiv.className = 'route-item';
+                locationDiv.innerHTML = `
+                    <div class="route-name">Route Details</div>
+                    <div class="route-detail">Pickup: ${data.from_location?.name || 'N/A'}</div>
+                    <div class="route-detail">Delivery: ${data.to_location?.name || 'N/A'}</div>
+                    <div class="route-detail" style="color: #667eea; font-weight: 600;">Distance: ${(data.distance_km || 0).toFixed(1)} km</div>
+                    <div class="route-detail">Est. Time: ${(data.estimated_time_min || 0).toFixed(0)} min</div>
+                `;
+                routesList.appendChild(locationDiv);
+            }
+            
+            // Show recalculation info if available
+            if (data.recalculations > 0) {
+                const recalcDiv = document.createElement('div');
+                recalcDiv.className = 'route-item';
+                recalcDiv.style.backgroundColor = '#fff3e0';
+                recalcDiv.innerHTML = `
+                    <div class="route-name" style="color: #f57c00;">✓ Optimizations</div>
+                    <div class="route-detail">Recalculations: ${data.recalculations}</div>
+                    <div class="route-detail">Final Distance: ${(data.distance_km || 0).toFixed(1)} km</div>
+                    <div class="route-detail">Final Time: ${(data.estimated_time_min || 0).toFixed(0)} min</div>
+                `;
+                routesList.appendChild(recalcDiv);
+            }
+            
+            // Display routes if available
+            if (data.routes && data.routes.length > 0) {
+                data.routes.forEach((route, idx) => {
+                    const routeDiv = document.createElement('div');
+                    routeDiv.className = 'route-item';
+                    routeDiv.innerHTML = `
+                        <div class="route-name">Route ${idx + 1}</div>
+                        <div class="route-detail">Distance: ${route.distance_km?.toFixed(1) || route.total_distance_km?.toFixed(1) || '-'} km</div>
+                        <div class="route-detail">Orders: ${route.orders?.length || route.stop_sequence?.length || '-'}</div>
+                        <div class="route-detail">Vehicle: ${route.vehicle_id || '-'}</div>
+                    `;
+                    routesList.appendChild(routeDiv);
+                });
+            }
+        }
+        
+        // Update status message
+        function updateStatus(status, message) {
+            const statusEl = document.getElementById('status');
+            const statusText = document.getElementById('statusText');
+            
+            statusEl.className = 'status ' + status;
+            statusText.textContent = message;
+        }
+        
+        // Update connection status
+        function updateConnectionStatus(connected) {
+            const connStatus = document.getElementById('connectionStatus');
+            connStatus.className = 'connection-status ' + (connected ? 'connected' : 'disconnected');
+            connStatus.innerHTML = `
+                <div class="connection-indicator"></div>
+                <span>${connected ? 'Connected' : 'Disconnected'}</span>
+            `;
+        }
+        
+        // ===== LOCATION SELECTION STATE =====
+        let pendingLocationSelection = {
+            results: [],
+            selectedIndex: null,
+            resolver: null
+        };
+        
+        // Calculate distance between two coordinates (Haversine formula)
+        function calculateDistance(lat1, lng1, lat2, lng2) {
+            const R = 6371; // Earth's radius in km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLng = (lng2 - lng1) * Math.PI / 180;
+            const a = 
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLng / 2) * Math.sin(dLng / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+        
+        // Rank locations by proximity and relevance
+        function rankLocations(results, biasLat, biasLng) {
+            return results.map(result => ({
+                ...result,
+                distance: calculateDistance(
+                    biasLat, biasLng,
+                    parseFloat(result.lat), parseFloat(result.lon)
+                ),
+                priority: result.importance || 0
+            })).sort((a, b) => {
+                // Prioritize by importance first, then by distance
+                if (Math.abs(b.priority - a.priority) > 0.1) {
+                    return b.priority - a.priority;
+                }
+                return a.distance - b.distance;
+            });
+        }
+        
+        // Check if coordinates are within India bounds
+        function isWithinIndiaBounds(lat, lng) {
+            // India bounds: lat 6-37°N, lng 68-97°E
+            return lat >= 6 && lat <= 37 && lng >= 68 && lng <= 97;
+        }
+        
+        // Show location selection modal
+        function showLocationModal(results, locationName) {
+            const modal = document.getElementById('locationModal');
+            const optionsDiv = document.getElementById('locationOptions');
+            optionsDiv.innerHTML = '';
+            
+            results.forEach((result, idx) => {
+                const option = document.createElement('div');
+                option.className = 'location-option';
+                option.innerHTML = `
+                    <div class="location-option-radio">
+                        <input type="radio" name="location" value="${idx}" id="loc_${idx}" 
+                               onchange="selectLocationOption(${idx})">
+                    </div>
+                    <div class="location-option-info">
+                        <div class="location-option-name">${result.display_name.split(',')[0]}</div>
+                        <div class="location-option-address">${result.display_name}</div>
+                        <div class="location-option-distance">
+                            📍 ${result.distance.toFixed(1)} km from current view
+                            ${result.indiaBounds ? '✓ India' : '⚠️ Outside India'}
+                        </div>
+                    </div>
+                `;
+                option.onclick = () => {
+                    document.getElementById(`loc_${idx}`).checked = true;
+                    selectLocationOption(idx);
+                };
+                optionsDiv.appendChild(option);
+            });
+            
+            pendingLocationSelection.results = results;
+            pendingLocationSelection.selectedIndex = 0;
+            document.getElementById(`loc_0`).checked = true;
+            
+            modal.classList.add('active');
+        }
+        
+        // Select location option
+        function selectLocationOption(idx) {
+            pendingLocationSelection.selectedIndex = idx;
+            document.querySelectorAll('.location-option').forEach((el, i) => {
+                el.classList.toggle('selected', i === idx);
+            });
+        }
+        
+        // Confirm location selection
+        function confirmLocationSelection() {
+            const idx = pendingLocationSelection.selectedIndex;
+            const selected = pendingLocationSelection.results[idx];
+            
+            document.getElementById('locationModal').classList.remove('active');
+            
+            if (pendingLocationSelection.resolver) {
+                pendingLocationSelection.resolver({
+                    lat: parseFloat(selected.lat),
+                    lng: parseFloat(selected.lon),
+                    name: selected.display_name.split(',')[0],
+                    address: selected.display_name,
+                    fullData: selected
+                });
+                pendingLocationSelection.resolver = null;
+            }
+        }
+        
+        // Cancel location selection
+        function cancelLocationSelection() {
+            document.getElementById('locationModal').classList.remove('active');
+            if (pendingLocationSelection.resolver) {
+                pendingLocationSelection.resolver(null);
+                pendingLocationSelection.resolver = null;
+            }
+        }
+        
+        // Check if coordinates are within valid world bounds
+        function validateCoordinates(lat, lng, locName) {
+            if (!lat || !lng) {
+                throw new Error(`${locName}: Missing coordinates`);
+            }
+            if (lat < -90 || lat > 90) {
+                throw new Error(`${locName}: Invalid latitude ${lat} (must be -90 to 90)`);
+            }
+            if (lng < -180 || lng > 180) {
+                throw new Error(`${locName}: Invalid longitude ${lng} (must be -180 to 180)`);
+            }
+            console.log(`[VALIDATE] ✓ ${locName}: (${lat.toFixed(4)}, ${lng.toFixed(4)}) is valid`);
+            return true;
+        }
+        
+        // Smart geocoding with location bias and ranking
+        async function geocodeLocation(locationName) {
+            try {
+                updateStatus('optimizing', `Looking up "${locationName}"...`);
+                
+                const mapCenter = map.getCenter();
+                const biasLat = mapCenter.lat;
+                const biasLng = mapCenter.lng;
+                
+                // ===== ATTEMPT 1: Fetch multiple results with proximity bias =====
+                let url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(locationName)}&limit=5&viewbox=${biasLng-5},${biasLat+5},${biasLng+5},${biasLat-5}&bounded=0`;
+                
+                let response = await fetch(url);
+                let data = await response.json();
+                
+                // ===== ATTEMPT 2: If no results, try with India constraint =====
+                if (data.length === 0) {
+                    console.log('[GEOCODE] No results with proximity bias, trying with India...');
+                    url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(locationName)}&countrycodes=in&limit=5`;
+                    response = await fetch(url);
+                    data = await response.json();
+                }
+                
+                // ===== ATTEMPT 3: Try with explicit India suffix =====
+                if (data.length === 0) {
+                    console.log('[GEOCODE] Still no results, trying with India suffix...');
+                    url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(locationName)},India&limit=5`;
+                    response = await fetch(url);
+                    data = await response.json();
+                }
+                
+                if (data.length === 0) {
+                    throw new Error(`"${locationName}" not found. Try city names like: Bangalore, Chennai, Salem, Hosur, Delhi, Mumbai, Pune, Hyderabad, Kolkata`);
+                }
+                
+                // ===== RANK results by proximity and relevance =====
+                const rankedResults = rankLocations(data, biasLat, biasLng);
+                
+                // ===== ADD bounds validation to each result =====
+                rankedResults.forEach(r => {
+                    r.indiaBounds = isWithinIndiaBounds(parseFloat(r.lat), parseFloat(r.lon));
+                });
+                
+                // ===== PRIORITIZE India results =====
+                const indiaResults = rankedResults.filter(r => r.indiaBounds);
+                const finalResults = indiaResults.length > 0 ? indiaResults : rankedResults;
+                
+                const bestMatch = finalResults[0];
+                const lat = parseFloat(bestMatch.lat);
+                const lng = parseFloat(bestMatch.lon);
+                
+                console.log('[GEOCODE] Top 3 matches:', {
+                    first: { name: finalResults[0].display_name.split(',')[0], distance: finalResults[0].distance.toFixed(1) + ' km' },
+                    second: finalResults[1] ? { name: finalResults[1].display_name.split(',')[0], distance: finalResults[1].distance.toFixed(1) + ' km' } : 'none',
+                    third: finalResults[2] ? { name: finalResults[2].display_name.split(',')[0], distance: finalResults[2].distance.toFixed(1) + ' km' } : 'none'
+                });
+                
+                // ===== SHOW modal if multiple good matches exist =====
+                if (finalResults.length > 1 && finalResults[0].distance - finalResults[1].distance < 50) {
+                    console.log('[GEOCODE] Multiple matches detected, showing selection modal...');
+                    
+                    const selected = await new Promise(resolve => {
+                        pendingLocationSelection.resolver = resolve;
+                        showLocationModal(finalResults.slice(0, 3), locationName);
+                    });
+                    
+                    if (!selected) {
+                        throw new Error('Location selection cancelled');
+                    }
+                    
+                    return selected;
+                }
+                
+                // ===== VALIDATE best match is within India =====
+                if (!isWithinIndiaBounds(lat, lng)) {
+                    console.warn('[GEOCODE] Best match outside India bounds, trying India-only search...');
+                    
+                    const indiaUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(locationName)}&countrycodes=in&limit=5`;
+                    const indiaResponse = await fetch(indiaUrl);
+                    const indiaData = await indiaResponse.json();
+                    
+                    if (indiaData.length === 0) {
+                        throw new Error(`"${locationName}" not found in India. Try: Bangalore, Chennai, Salem, Hosur, Delhi, Mumbai, etc.`);
+                    }
+                    
+                    const indiaRanked = rankLocations(indiaData, biasLat, biasLng);
+                    const indiaMatch = indiaRanked[0];
+                    
+                    const indiaLat = parseFloat(indiaMatch.lat);
+                    const indiaLng = parseFloat(indiaMatch.lon);
+                    validateCoordinates(indiaLat, indiaLng, locationName);
+                    
+                    return {
+                        lat: indiaLat,
+                        lng: indiaLng,
+                        name: indiaMatch.display_name.split(',')[0],
+                        address: indiaMatch.display_name
+                    };
+                }
+                
+                console.log('[GEOCODE] ✓ Location found:', {
+                    name: bestMatch.display_name.split(',')[0],
+                    lat: lat.toFixed(4),
+                    lng: lng.toFixed(4),
+                    distance: bestMatch.distance.toFixed(1) + ' km from map center',
+                    indiaBounds: isWithinIndiaBounds(lat, lng)
+                });
+                
+                validateCoordinates(lat, lng, locationName);
+                
+                return {
+                    lat: lat,
+                    lng: lng,
+                    name: bestMatch.display_name.split(',')[0],
+                    address: bestMatch.display_name
+                };
+            } catch (error) {
+                throw new Error(`Geocoding error: ${error.message}`);
+            }
+        }
+        
+        
+        // Start optimization
+        async function startOptimization() {
+            const startBtn = document.getElementById('startBtn');
+            startBtn.disabled = true;
+            
+            try {
+                if (!ws || ws.readyState !== WebSocket.OPEN) {
+                    updateStatus('error', 'WebSocket not connected. Waiting for connection...');
+                    startBtn.disabled = false;
+                    return;
+                }
+                
+                // ===== GENERATE NEW JOB ID FOR THIS REQUEST =====
+                currentJobId = Date.now();  // Unique ID for this request
+                activeJobId = null;  // Reset backend job tracking
+                console.log('[STATE] 🟡 New request job_id:', currentJobId);
+                
+                // ===== HARD CLEAR ALL PREVIOUS ROUTES AND MARKERS =====
+                hardClearMap();
+                
+                // ===== SET UP TIMEOUT FAILSAFE (15 seconds) =====
+                // Prevent UI from freezing at 90% if server doesn't respond
+                routingTimeoutId = setTimeout(() => {
+                    if (routeState.isLoading && currentJobId) {
+                        console.error('[TIMEOUT] Routing took too long. Forcing completion.');
+                        updateStatus('error', 'Routing timeout (15s). Try again.');
+                        document.getElementById('startBtn').disabled = false;
+                        routeState.isLoading = false;
+                        activeJobId = null;  // Invalidate job
+                    }
+                }, 15000);
+                
+                // SET LOADING STATE
+                routeState.isLoading = true;
+                routeState.currentRoute = null;
+                routeState.routingStartTime = Date.now();
+                
+                // Get input values
+                const fromInput = document.getElementById('fromLocation').value.trim();
+                const toInput = document.getElementById('toLocation').value.trim();
+                const fromManualCoords = document.getElementById('fromCoords').value.trim();
+                const toManualCoords = document.getElementById('toCoords').value.trim();
+                const date = document.getElementById('deliveryDate').value;
+                
+                // Validate inputs
+                if (!fromInput || !toInput) {
+                    alert('Please enter both From and To location names (e.g., "Chennai", "Bangalore")');
+                    startBtn.disabled = false;
+                    routeState.isLoading = false;
+                    return;
+                }
+                
+                // Show loading state
+                updateStatus('loading', '🔍 Searching for locations...');
+                document.getElementById('routesList').innerHTML = '<p style="color: #2196F3; font-size: 12px;">🔍 Searching for locations...</p>';
+                
+                let fromCoords, toCoords;
+                
+                // Try manual coordinates first if provided, otherwise geocode
+                if (fromManualCoords) {
+                    try {
+                        const from = fromManualCoords.split(',').map(c => parseFloat(c.trim()));
+                        if (from.length === 2 && !isNaN(from[0]) && !isNaN(from[1])) {
+                            fromCoords = { lat: from[0], lng: from[1], name: fromInput, address: fromInput };
+                        } else {
+                            fromCoords = await geocodeLocation(fromInput);
+                        }
+                    } catch (err) {
+                        fromCoords = await geocodeLocation(fromInput);
+                    }
+                } else {
+                    fromCoords = await geocodeLocation(fromInput);
+                }
+                
+                if (toManualCoords) {
+                    try {
+                        const to = toManualCoords.split(',').map(c => parseFloat(c.trim()));
+                        if (to.length === 2 && !isNaN(to[0]) && !isNaN(to[1])) {
+                            toCoords = { lat: to[0], lng: to[1], name: toInput, address: toInput };
+                        } else {
+                            toCoords = await geocodeLocation(toInput);
+                        }
+                    } catch (err) {
+                        toCoords = await geocodeLocation(toInput);
+                    }
+                } else {
+                    toCoords = await geocodeLocation(toInput);
+                }
+                
+                // Update display with found locations
+                document.getElementById('fromCoords').value = `${fromCoords.lat.toFixed(4)}, ${fromCoords.lng.toFixed(4)}`;
+                document.getElementById('toCoords').value = `${toCoords.lat.toFixed(4)}, ${toCoords.lng.toFixed(4)}`;
+                
+                // ===== VALIDATE COORDINATES BEFORE SENDING =====
+                console.log('[OPTIMIZE] Validating coordinates...');
+                validateCoordinates(fromCoords.lat, fromCoords.lng, `FROM: ${fromCoords.name}`);
+                validateCoordinates(toCoords.lat, toCoords.lng, `TO: ${toCoords.name}`);
+                
+                updateStatus('loading', '✓ Locations found. Calculating route...');
+                document.getElementById('routesList').innerHTML = '<p style="color: #4caf50; font-size: 12px;">✓ Locations found. Calculating route...</p>';
+                
+                // Send start signal with from/to locations (FRESH API CALL)
+                console.log('[OPTIMIZE] ====== SENDING OPTIMIZATION REQUEST ======');
+                console.log('[OPTIMIZE] FROM:', {name: fromCoords.name, lat: fromCoords.lat, lng: fromCoords.lng});
+                console.log('[OPTIMIZE] TO:', {name: toCoords.name, lat: toCoords.lat, lng: toCoords.lng});
+                console.log('[OPTIMIZE] Mode: from_to');
+                console.log('[OPTIMIZE] Date:', date);
+                console.log('[OPTIMIZE] Client Job ID:', currentJobId);
+                ws.send(JSON.stringify({
+                    type: 'start_optimization',
+                    mode: 'from_to',
+                    from_location: fromCoords,
+                    to_location: toCoords,
+                    depot_id: 1,
+                    delivery_date: date,
+                    client_job_id: currentJobId  // Track which request this is
+                }));
+                
+            } catch (error) {
+                // CLEANUP: Cancel timeout, disable loading, re-enable button
+                if (routingTimeoutId) {
+                    clearTimeout(routingTimeoutId);
+                    routingTimeoutId = null;
+                }
+                routeState.isLoading = false;
+                activeJobId = null;
+                updateStatus('error', error.message);
+                alert('Error: ' + error.message);
+                startBtn.disabled = false;
+            }
+        }
+        
+        // Initialize on load
+        window.addEventListener('load', () => {
+            getToken();
+        });
+    </script>
+    
+    <!-- Location Selection Modal -->
+    <div id="locationModal" class="location-modal">
+        <div class="location-modal-content">
+            <div class="location-modal-title">Select Location</div>
+            <div class="location-modal-subtitle">Multiple matches found. Please select the correct location:</div>
+            <div id="locationOptions"></div>
+            <div class="location-modal-actions">
+                <button class="location-modal-btn secondary" onclick="cancelLocationSelection()">Cancel</button>
+                <button class="location-modal-btn primary" onclick="confirmLocationSelection()">Select</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
